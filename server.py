@@ -42,6 +42,91 @@ DINX_LIST_URL = os.environ.get("DINX_LIST_URL", "https://bff.prd.dinx.app/site.b
 fetch_lock = threading.Lock()
 is_fetching = False
 
+# Redis mapping functions
+def fetch_redis_mapping():
+    redis_url = os.environ.get("REDIS_URL") or os.environ.get("REDIS_PUBLIC_URL")
+    redis_host = os.environ.get("REDISHOST")
+    redis_port = int(os.environ.get("REDISPORT", 6379))
+    redis_password = os.environ.get("REDISPASSWORD") or os.environ.get("REDIS_PASSWORD")
+    
+    mapping = {}  # email/phone -> lead_id
+    try:
+        import redis
+        conn = None
+        if redis_url:
+            print("Connecting to Redis via URL...")
+            conn = redis.Redis.from_url(redis_url, decode_responses=True)
+        elif redis_host:
+            print(f"Connecting to Redis via host {redis_host}...")
+            conn = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
+        else:
+            print("No Redis configuration found in environment variables.")
+            return {}
+            
+        for key in conn.scan_iter("*"):
+            try:
+                val_str = conn.get(key)
+                if val_str:
+                    val = json.loads(val_str)
+                    lead_id = val.get("lead_id")
+                    payload = val.get("payload", {})
+                    email = payload.get("email")
+                    phone = val.get("phone_digits") or payload.get("phone")
+                    
+                    if lead_id:
+                        if email:
+                            mapping[email.lower().strip()] = lead_id
+                        if phone:
+                            clean_phone = "".join(filter(str.isdigit, str(phone)))
+                            if len(clean_phone) >= 10:
+                                mapping[clean_phone[-11:]] = lead_id
+            except Exception as e:
+                pass
+        print(f"Loaded {len(mapping)} mappings from Redis.")
+    except Exception as e:
+        print("Error fetching from Redis:", e)
+    return mapping
+
+def fetch_meta_form_leads(form_id):
+    leads_mapping = {}  # lead_id -> campaign_id
+    try:
+        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id&limit=1000&access_token={META_ACCESS_TOKEN}"
+        while url:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req) as resp:
+                res = json.loads(resp.read().decode("utf-8"))
+                for lead in res.get("data", []):
+                    l_id = lead.get("id")
+                    c_id = lead.get("campaign_id")
+                    if l_id and c_id:
+                        leads_mapping[l_id] = c_id
+                paging = res.get("paging", {})
+                url = paging.get("next")
+        print(f"Fetched {len(leads_mapping)} leads from Meta Form {form_id}.")
+    except Exception as e:
+        print(f"Error fetching leads for form {form_id}:", e)
+    return leads_mapping
+
+META_LEAD_CAMPAIGN_CACHE = {}  # lead_id -> campaign_id
+
+def get_campaign_for_lead(lead_id, form_leads_mapping):
+    if lead_id in form_leads_mapping:
+        return form_leads_mapping[lead_id]
+    if lead_id in META_LEAD_CAMPAIGN_CACHE:
+        return META_LEAD_CAMPAIGN_CACHE[lead_id]
+    try:
+        url = f"https://graph.facebook.com/{META_VERSION}/{lead_id}?fields=campaign_id&access_token={META_ACCESS_TOKEN}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            c_id = res.get("campaign_id")
+            if c_id:
+                META_LEAD_CAMPAIGN_CACHE[lead_id] = c_id
+                return c_id
+    except Exception as e:
+        pass
+    return None
+
 # Cache for custom Meta API queries (to avoid hitting Meta API repeatedly for the same dates)
 CUSTOM_META_CACHE = {}  # Key: "start_date:end_date", Value: (timestamp, campaigns_list)
 CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
@@ -431,15 +516,23 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # 5. Campaign Attribution Logic (Dinx Backoffice to Meta Campaigns)
     from urllib.parse import urlparse, parse_qs
     
+    # Load Redis mapping (email/phone -> lead_id)
+    redis_mapping = fetch_redis_mapping()
+    
+    # Load Meta form leads mapping (lead_id -> campaign_id)
+    form_leads_mapping = fetch_meta_form_leads("2230521901040318")
+    
     # Direct UTM campaign mapping: campaign_id -> { "leads": 0, "approved": 0, "activated": 0 }
     direct_attributions = {}
-    unattributed_meta_leads = []
     
     # For attribution, we filter leads by range to match campaign dates
     for r in dinx_requests:
         created_at = r.get("createdAt")
         status = r.get("status")
         school = r.get("schoolType")
+        email = r.get("email")
+        phone = r.get("phone")
+        
         is_qualificado = status in ["SITE_BETA_ACCESS_INVITE_STATUS_APPROVED", "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"]
         is_ativado = (status == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED" and school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")
         
@@ -455,24 +548,49 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
             continue
             
         attributed = False
-        l_url = r.get("landingUrl")
-        if l_url and in_creation_range:
-            try:
-                parsed = urlparse(l_url)
-                qs = parse_qs(parsed.query)
-                if "utm_campaign" in qs:
-                    camp_id = qs["utm_campaign"][0]
-                    if camp_id:
-                        if camp_id not in direct_attributions:
-                            direct_attributions[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
-                        direct_attributions[camp_id]["leads"] += 1
-                        if is_qualificado:
-                            direct_attributions[camp_id]["approved"] += 1
-                        if is_ativado and in_activation_range:
-                            direct_attributions[camp_id]["activated"] += 1
-                        attributed = True
-            except:
-                pass
+        
+        # 1. Try Redis mapping first
+        lead_id = None
+        if email:
+            lead_id = redis_mapping.get(email.lower().strip())
+        if not lead_id and phone:
+            clean_phone = "".join(filter(str.isdigit, str(phone)))
+            if len(clean_phone) >= 10:
+                lead_id = redis_mapping.get(clean_phone[-11:])
+                
+        if lead_id:
+            camp_id = get_campaign_for_lead(lead_id, form_leads_mapping)
+            if camp_id:
+                if camp_id not in direct_attributions:
+                    direct_attributions[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
+                if in_creation_range:
+                    direct_attributions[camp_id]["leads"] += 1
+                    if is_qualificado:
+                        direct_attributions[camp_id]["approved"] += 1
+                if is_ativado and in_activation_range:
+                    direct_attributions[camp_id]["activated"] += 1
+                attributed = True
+                
+        # 2. Fallback to direct UTM campaign mapping
+        if not attributed:
+            l_url = r.get("landingUrl")
+            if l_url and in_creation_range:
+                try:
+                    parsed = urlparse(l_url)
+                    qs = parse_qs(parsed.query)
+                    if "utm_campaign" in qs:
+                        camp_id = qs["utm_campaign"][0]
+                        if camp_id:
+                            if camp_id not in direct_attributions:
+                                direct_attributions[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
+                            direct_attributions[camp_id]["leads"] += 1
+                            if is_qualificado:
+                                direct_attributions[camp_id]["approved"] += 1
+                            if is_ativado and in_activation_range:
+                                direct_attributions[camp_id]["activated"] += 1
+                            attributed = True
+                except:
+                    pass
                 
     # Load Meta Campaigns for the requested date_range
     meta_campaigns_raw = []
