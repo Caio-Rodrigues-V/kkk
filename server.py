@@ -6,50 +6,56 @@ import urllib.parse
 from datetime import datetime, timedelta
 import os
 import sys
+import threading
 
 # Ensure UTF-8 console output
 sys.stdout.reconfigure(encoding='utf-8')
 
 PORT = int(os.environ.get("PORT", 8000))
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "public")
-CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache.json")
+RAW_CACHE_FILE = os.path.join(os.path.dirname(__file__), "raw_cache.json")
 CACHE_EXPIRY_MINUTES = 15
 
-# API Keys and tokens from user request
-META_ACCESS_TOKEN = "EAAO4iW6Iza4BRZB9QAuxJbtOpMDZCPfvXPbKzlkAE0A2PL6UKEccwytf8OEnMhcM0Ak6HUzhxAsPd1sU5ze7nbvUd3U2Iu9hEYcBjZCqiz6YWxqs3Ow5O3TZBSAuazdnJPJuYzcZApk1swuqK2L8xv25ShwLxdTKKNCMHNH30IGNglpbjiahZCe9vDTedZC6ffA"
-META_AD_ACCOUNT = "act_814077324704125"
-META_IG_ACCOUNT = "17841470282486347"
-META_VERSION = "v25.0"
-
-DINX_API_KEY = "WjdYLb55nKAqabVHxMfdLWr3Sl2DCL8JCPeOHanwn2l9SapS9x"
-DINX_LIST_URL = "https://bff.prd.dinx.app/site.beta_access.v1.SiteBetaAccessService/ListBetaAccess"
-
-def fetch_live_data():
-    print(f"[{datetime.now().isoformat()}] Fetching live data from Dinx and Meta APIs...")
-    
-    # 1. Fetch Dinx leads (all 16,000+ items)
-    dinx_requests = []
+# Try to load env variables from a local .env file if it exists (for local development)
+env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(env_path):
     try:
-        req = urllib.request.Request(
-            DINX_LIST_URL,
-            data=json.dumps({}).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": DINX_API_KEY,
-                "User-Agent": "Mozilla/5.0"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req) as resp:
-            dinx_res = json.loads(resp.read().decode("utf-8"))
-            dinx_requests = dinx_res.get("requests", [])
-            print(f"Fetched {len(dinx_requests)} leads from Dinx API.")
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, val = line.split("=", 1)
+                    os.environ[key.strip()] = val.strip()
     except Exception as e:
-        print("Error fetching Dinx data:", e)
-        
-    # 2. Fetch Meta Ads Campaigns and insights
+        print("Warning: Could not parse .env file:", e)
+
+# API Keys and tokens loaded from environment variables (Railway or .env)
+META_ACCESS_TOKEN = os.environ.get("META_ACCESS_TOKEN")
+META_AD_ACCOUNT = os.environ.get("META_AD_ACCOUNT")
+META_IG_ACCOUNT = os.environ.get("META_IG_ACCOUNT")
+META_VERSION = os.environ.get("META_VERSION", "v25.0")
+
+DINX_API_KEY = os.environ.get("DINX_API_KEY")
+DINX_LIST_URL = os.environ.get("DINX_LIST_URL", "https://bff.prd.dinx.app/site.beta_access.v1.SiteBetaAccessService/ListBetaAccess")
+
+# Thread lock & state for background updates
+fetch_lock = threading.Lock()
+is_fetching = False
+
+# Cache for custom Meta API queries (to avoid hitting Meta API repeatedly for the same dates)
+CUSTOM_META_CACHE = {}  # Key: "start_date:end_date", Value: (timestamp, campaigns_list)
+CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
+
+def get_custom_meta_campaigns(start_date, end_date):
+    key = f"{start_date}:{end_date}"
+    now = datetime.now()
+    if key in CUSTOM_META_CACHE:
+        cache_time, data = CUSTOM_META_CACHE[key]
+        if now - cache_time < CUSTOM_META_CACHE_EXPIRY:
+            print(f"Serving custom range Meta data for {key} from memory cache.")
+            return data
+            
     meta_campaigns = []
-    meta_insights = []
     try:
         # Get campaigns metadata (status, effective_status)
         url_c = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=100&access_token={META_ACCESS_TOKEN}"
@@ -60,8 +66,58 @@ def fetch_live_data():
             for c in campaigns_res.get("data", []):
                 campaigns_meta[c["id"]] = c
                 
-        # Get insights (spend, clicks, actions, cpc, ctr)
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset=maximum&limit=100&access_token={META_ACCESS_TOKEN}"
+        # Get insights with custom range
+        time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&time_range={time_range}&limit=100&access_token={META_ACCESS_TOKEN}"
+        req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_i) as resp:
+            insights_res = json.loads(resp.read().decode("utf-8"))
+            meta_insights = insights_res.get("data", [])
+            
+        for item in meta_insights:
+            c_id = item.get("campaign_id")
+            meta_info = campaigns_meta.get(c_id, {})
+            
+            leads = 0
+            for action in item.get("actions", []):
+                if action.get("action_type") == "lead":
+                    leads = int(action.get("value", 0))
+                    break
+                    
+            meta_campaigns.append({
+                "id": c_id,
+                "name": item.get("campaign_name"),
+                "status": meta_info.get("status", "PAUSED"),
+                "effective_status": meta_info.get("effective_status", "PAUSED"),
+                "objective": meta_info.get("objective", "OUTCOME"),
+                "spend": float(item.get("spend", 0.0)),
+                "impressions": int(item.get("impressions", 0)),
+                "clicks": int(item.get("clicks", 0)),
+                "ctr": float(item.get("ctr", 0.0)),
+                "cpc": float(item.get("cpc", 0.0)),
+                "leads": leads
+            })
+        print(f"Fetched {len(meta_campaigns)} campaigns for custom range {start_date} to {end_date}.")
+        CUSTOM_META_CACHE[key] = (now, meta_campaigns)
+    except Exception as e:
+        print(f"Error fetching Meta Ads data for custom range {start_date} to {end_date}:", e)
+        
+    return meta_campaigns
+
+def fetch_meta_campaigns(preset):
+    meta_campaigns = []
+    try:
+        # Get campaigns metadata (status, effective_status)
+        url_c = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=100&access_token={META_ACCESS_TOKEN}"
+        req_c = urllib.request.Request(url_c, headers={"User-Agent": "Mozilla/5.0"})
+        campaigns_meta = {}
+        with urllib.request.urlopen(req_c) as resp:
+            campaigns_res = json.loads(resp.read().decode("utf-8"))
+            for c in campaigns_res.get("data", []):
+                campaigns_meta[c["id"]] = c
+                
+        # Get insights with the specific date_preset
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset={preset}&limit=100&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
@@ -92,14 +148,45 @@ def fetch_live_data():
                 "cpc": float(item.get("cpc", 0.0)),
                 "leads": leads
             })
-        print(f"Fetched {len(meta_campaigns)} campaigns with insights from Meta Ads.")
+        print(f"Fetched {len(meta_campaigns)} campaigns for preset '{preset}'.")
     except Exception as e:
-        print("Error fetching Meta Ads data:", e)
-        if hasattr(e, "read"):
-            try:
-                print("Error body:", e.read().decode("utf-8"))
-            except:
-                pass
+        print(f"Error fetching Meta Ads data for preset '{preset}':", e)
+    return meta_campaigns
+
+def fetch_raw_live_data():
+    print(f"[{datetime.now().isoformat()}] Fetching live data from Dinx and Meta APIs...")
+    
+    # 1. Fetch Dinx leads (all 16,000+ items)
+    dinx_requests = []
+    try:
+        req = urllib.request.Request(
+            DINX_LIST_URL,
+            data=json.dumps({}).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": DINX_API_KEY,
+                "User-Agent": "Mozilla/5.0"
+            },
+            method="POST"
+        )
+        with urllib.request.urlopen(req) as resp:
+            dinx_res = json.loads(resp.read().decode("utf-8"))
+            dinx_requests = dinx_res.get("requests", [])
+            print(f"Fetched {len(dinx_requests)} leads from Dinx API.")
+    except Exception as e:
+        print("Error fetching Dinx data:", e)
+        
+    # 2. Fetch Meta Ads Campaigns for different presets
+    meta_campaigns_by_preset = {}
+    presets_map = {
+        "all": "maximum",
+        "7days": "last_7d",
+        "30days": "last_30d",
+        "thismonth": "this_month",
+        "lastmonth": "last_month"
+    }
+    for range_key, preset in presets_map.items():
+        meta_campaigns_by_preset[range_key] = fetch_meta_campaigns(preset)
 
     # 3. Fetch Instagram profile & media
     ig_profile = {}
@@ -121,10 +208,150 @@ def fetch_live_data():
     except Exception as e:
         print("Error fetching Instagram data:", e)
         
-    # 4. Aggregations & Calculations
+    return {
+        "last_updated": datetime.now().isoformat(),
+        "dinx_requests": dinx_requests,
+        "meta_campaigns": meta_campaigns_by_preset,
+        "ig_profile": ig_profile,
+        "ig_media": ig_media
+    }
+
+def save_raw_cache(raw_data):
+    try:
+        with open(RAW_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(raw_data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Error saving raw cache:", e)
+
+def load_raw_cache():
+    if os.path.exists(RAW_CACHE_FILE):
+        try:
+            with open(RAW_CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print("Error reading raw cache:", e)
+    return None
+
+def start_background_fetch():
+    global is_fetching
+    with fetch_lock:
+        if is_fetching:
+            return
+        is_fetching = True
+        
+    def run_fetch():
+        global is_fetching
+        try:
+            print(f"[{datetime.now().isoformat()}] Starting background live data fetch...")
+            raw_data = fetch_raw_live_data()
+            save_raw_cache(raw_data)
+            print(f"[{datetime.now().isoformat()}] Background live data fetch completed and cache saved.")
+        except Exception as e:
+            print(f"[{datetime.now().isoformat()}] Error in background live data fetch:", e)
+        finally:
+            is_fetching = False
+            
+    threading.Thread(target=run_fetch, daemon=True).start()
+
+def is_internal_email(email):
+    if not email:
+        return False
+    email = email.lower().strip()
+    return "dinx.app" in email or "dinxapp.com" in email or "take" in email
+
+def get_date_range_bounds(range_key, start_str=None, end_str=None):
+    today = datetime.now()
+    if range_key == "7days":
+        start = today - timedelta(days=6)
+        return start.replace(hour=0, minute=0, second=0, microsecond=0), None
+    elif range_key == "30days":
+        start = today - timedelta(days=29)
+        return start.replace(hour=0, minute=0, second=0, microsecond=0), None
+    elif range_key == "thismonth":
+        start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return start, None
+    elif range_key == "lastmonth":
+        first_of_this_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        end = first_of_this_month - timedelta(microseconds=1)
+        start = (first_of_this_month - timedelta(days=15)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        return start, end
+    elif range_key == "custom":
+        start = None
+        end = None
+        if start_str:
+            try:
+                start = datetime.strptime(start_str, "%Y-%m-%d")
+            except:
+                pass
+        if end_str:
+            try:
+                end = datetime.strptime(end_str, "%Y-%m-%d").replace(hour=23, minute=59, second=59, microsecond=999999)
+            except:
+                pass
+        return start, end
+    return None, None
+
+def date_in_range(date_str, start_bound, end_bound):
+    if not date_str:
+        return False
+    try:
+        dt = datetime.fromisoformat(date_str[:19])
+        if start_bound and dt < start_bound:
+            return False
+        if end_bound and dt > end_bound:
+            return False
+        return True
+    except:
+        return False
+
+def date_str_in_range(day_str, start_bound, end_bound):
+    try:
+        dt = datetime.strptime(day_str, "%Y-%m-%d")
+        if start_bound and dt < start_bound:
+            return False
+        if end_bound and dt > end_bound:
+            return False
+        return True
+    except:
+        return True
+
+def get_processed_data(exclude_internal=False, date_range="all", start_date=None, end_date=None):
+    # Load raw data from cache
+    raw_data = load_raw_cache()
     
-    # Dinx counters
-    dinx_totals = len(dinx_requests)
+    # If no cache exists, do a synchronous fetch to initialize it
+    if not raw_data:
+        print("No raw cache found. Performing synchronous fetch...")
+        raw_data = fetch_raw_live_data()
+        save_raw_cache(raw_data)
+    else:
+        # Check if cache is expired (older than CACHE_EXPIRY_MINUTES)
+        try:
+            updated_time = datetime.fromisoformat(raw_data["last_updated"])
+            if datetime.now() - updated_time >= timedelta(minutes=CACHE_EXPIRY_MINUTES):
+                print("Cache expired. Triggering background fetch...")
+                start_background_fetch()
+        except Exception as e:
+            print("Error checking cache expiry:", e)
+            start_background_fetch()
+
+    # Perform the aggregations and attribution calculation dynamically on the raw_data
+    dinx_requests_raw = raw_data.get("dinx_requests", [])
+    meta_campaigns_raw_all = raw_data.get("meta_campaigns", {})
+    ig_profile = raw_data.get("ig_profile", {})
+    ig_media = raw_data.get("ig_media", [])
+
+    # Filter out internal emails if requested
+    if exclude_internal:
+        dinx_requests = [r for r in dinx_requests_raw if not is_internal_email(r.get("email"))]
+    else:
+        dinx_requests = list(dinx_requests_raw)
+
+    # Calculate date range boundaries for Dinx leads
+    start_bound, end_bound = get_date_range_bounds(date_range, start_date, end_date)
+
+    # 4. Aggregations & Calculations (Filtered by Date Range)
+    dinx_totals = 0
     status_counts = {}
     school_counts = {}
     income_counts = {}
@@ -136,51 +363,70 @@ def fetch_live_data():
     ativados_count = 0
     qualificados_private_count = 0
     
+    # Process registrations, qualifications, and breakdowns in date range
     for r in dinx_requests:
+        created_at = r.get("createdAt")
         status = r.get("status")
         school = r.get("schoolType")
         income = r.get("incomeRange")
         device = r.get("deviceType")
         origin = r.get("origin")
-        created_at = r.get("createdAt")
-        
-        # Categorizations
-        status_counts[status] = status_counts.get(status, 0) + 1
-        school_counts[school] = school_counts.get(school, 0) + 1
-        income_counts[income] = income_counts.get(income, 0) + 1
-        device_counts[device] = device_counts.get(device, 0) + 1
-        origin_counts[origin] = origin_counts.get(origin, 0) + 1
         
         is_qualificado = status in ["SITE_BETA_ACCESS_INVITE_STATUS_APPROVED", "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"]
-        is_ativado = (status == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED") and (school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")
+        is_ativado = (status == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED" and school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")
         
-        if is_qualificado:
-            qualificados_count += 1
-            if school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE":
-                qualificados_private_count += 1
-        if is_ativado:
-            ativados_count += 1
+        # Check if lead creation falls within date range for cohort breakdowns & registrations
+        in_creation_range = date_in_range(created_at, start_bound, end_bound)
+        
+        # Check if activation falls within date range
+        activated_at = r.get("activatedAt")
+        act_date_str = activated_at if activated_at else created_at
+        in_activation_range = date_in_range(act_date_str, start_bound, end_bound)
+        
+        if in_creation_range:
+            dinx_totals += 1
+            status_counts[status] = status_counts.get(status, 0) + 1
+            school_counts[school] = school_counts.get(school, 0) + 1
+            income_counts[income] = income_counts.get(income, 0) + 1
+            device_counts[device] = device_counts.get(device, 0) + 1
+            origin_counts[origin] = origin_counts.get(origin, 0) + 1
             
-        # Daily registrations, qualifications and activations trend (cohort-based)
-        if created_at:
-            day_str = created_at[:10]  # YYYY-MM-DD
-            if day_str not in daily_registrations:
-                daily_registrations[day_str] = {"cadastros": 0, "qualificados": 0, "ativados": 0}
-            daily_registrations[day_str]["cadastros"] += 1
             if is_qualificado:
-                daily_registrations[day_str]["qualificados"] += 1
-            if is_ativado:
-                daily_registrations[day_str]["ativados"] += 1
+                qualificados_count += 1
+                if school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE":
+                    qualificados_private_count += 1
+                    
+            # Registrations & Qualifications trends
+            if created_at:
+                day_str = created_at[:10]  # YYYY-MM-DD
+                if day_str not in daily_registrations:
+                    daily_registrations[day_str] = {"cadastros": 0, "qualificados": 0, "ativados": 0, "ativados_cohort": 0}
+                daily_registrations[day_str]["cadastros"] += 1
+                if is_qualificado:
+                    daily_registrations[day_str]["qualificados"] += 1
+                if is_ativado:
+                    daily_registrations[day_str]["ativados_cohort"] += 1
+                    
+        # Activations are mapped to their actual activation date and checked against activation range
+        if is_ativado and in_activation_range:
+            ativados_count += 1
+            if act_date_str:
+                act_day_str = act_date_str[:10]
+                if act_day_str not in daily_registrations:
+                    daily_registrations[act_day_str] = {"cadastros": 0, "qualificados": 0, "ativados": 0, "ativados_cohort": 0}
+                daily_registrations[act_day_str]["ativados"] += 1
                 
-    # Sort daily registrations by date
+    # Sort and filter daily registrations by date
     sorted_daily = []
     for day in sorted(daily_registrations.keys()):
-        sorted_daily.append({
-            "date": day,
-            "cadastros": daily_registrations[day]["cadastros"],
-            "qualificados": daily_registrations[day]["qualificados"],
-            "ativados": daily_registrations[day]["ativados"]
-        })
+        if date_str_in_range(day, start_bound, end_bound):
+            sorted_daily.append({
+                "date": day,
+                "cadastros": daily_registrations[day].get("cadastros", 0),
+                "qualificados": daily_registrations[day].get("qualificados", 0),
+                "ativados": daily_registrations[day].get("ativados", 0),
+                "ativados_cohort": daily_registrations[day].get("ativados_cohort", 0)
+            })
         
     # 5. Campaign Attribution Logic (Dinx Backoffice to Meta Campaigns)
     from urllib.parse import urlparse, parse_qs
@@ -189,15 +435,28 @@ def fetch_live_data():
     direct_attributions = {}
     unattributed_meta_leads = []
     
+    # For attribution, we filter leads by range to match campaign dates
     for r in dinx_requests:
+        created_at = r.get("createdAt")
         status = r.get("status")
+        school = r.get("schoolType")
         is_qualificado = status in ["SITE_BETA_ACCESS_INVITE_STATUS_APPROVED", "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"]
-        is_qualificado = status in ["SITE_BETA_ACCESS_INVITE_STATUS_APPROVED", "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"]
-        is_ativado = (status == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED") and (school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")
+        is_ativado = (status == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED" and school == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")
         
+        # Check if creation is in range
+        in_creation_range = date_in_range(created_at, start_bound, end_bound)
+        
+        # Check if activation is in range
+        activated_at = r.get("activatedAt")
+        act_date_str = activated_at if activated_at else created_at
+        in_activation_range = date_in_range(act_date_str, start_bound, end_bound)
+        
+        if not (in_creation_range or in_activation_range):
+            continue
+            
         attributed = False
         l_url = r.get("landingUrl")
-        if l_url:
+        if l_url and in_creation_range:
             try:
                 parsed = urlparse(l_url)
                 qs = parse_qs(parsed.query)
@@ -209,59 +468,34 @@ def fetch_live_data():
                         direct_attributions[camp_id]["leads"] += 1
                         if is_qualificado:
                             direct_attributions[camp_id]["approved"] += 1
-                        if is_ativado:
+                        if is_ativado and in_activation_range:
                             direct_attributions[camp_id]["activated"] += 1
                         attributed = True
             except:
                 pass
                 
-        if not attributed and r.get("origin") == "SITE_BETA_ACCESS_INVITE_ORIGIN_META":
-            unattributed_meta_leads.append(r)
-            
-    total_unattributed_leads = len(unattributed_meta_leads)
-    total_unattributed_approved = len([r for r in unattributed_meta_leads if r.get("status") in ["SITE_BETA_ACCESS_INVITE_STATUS_APPROVED", "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"]])
-    total_unattributed_activated = len([r for r in unattributed_meta_leads if (r.get("status") == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED") and (r.get("schoolType") == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE")])
-    
-    total_meta_leads_reported = sum(c["leads"] for c in meta_campaigns)
-    
-    # Calculate float shares and base integer parts
-    shares_leads = []
-    shares_approved = []
-    shares_activated = []
-    
-    for c in meta_campaigns:
-        c_meta_leads = c["leads"]
-        prop = (c_meta_leads / total_meta_leads_reported) if total_meta_leads_reported > 0 else 0.0
+    # Load Meta Campaigns for the requested date_range
+    meta_campaigns_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_campaigns_raw = get_custom_meta_campaigns(start_date, end_date)
+    elif isinstance(meta_campaigns_raw_all, dict):
+        meta_campaigns_raw = meta_campaigns_raw_all.get(date_range, [])
+    else:
+        # Fallback for old cache structure
+        meta_campaigns_raw = meta_campaigns_raw_all if date_range == "all" else []
         
-        shares_leads.append(prop * total_unattributed_leads)
-        shares_approved.append(prop * total_unattributed_approved)
-        shares_activated.append(prop * total_unattributed_activated)
-        
-    def distribute_largest_remainder(shares, total_target):
-        if total_target <= 0:
-            return [0] * len(shares)
-        ints = [int(x) for x in shares]
-        remainders = [(x - i, idx) for idx, (x, i) in enumerate(zip(shares, ints))]
-        diff = total_target - sum(ints)
-        # Sort by remainder descending
-        remainders.sort(key=lambda item: item[0], reverse=True)
-        for k in range(min(diff, len(shares))):
-            idx = remainders[k][1]
-            ints[idx] += 1
-        return ints
+    meta_campaigns = []
+    for c in meta_campaigns_raw:
+        meta_campaigns.append(dict(c))
 
-    allocated_leads = distribute_largest_remainder(shares_leads, total_unattributed_leads)
-    allocated_approved = distribute_largest_remainder(shares_approved, total_unattributed_approved)
-    allocated_activated = distribute_largest_remainder(shares_activated, total_unattributed_activated)
-    
-    # Enrich campaign list with attributed backoffice data
-    for idx, c in enumerate(meta_campaigns):
+    # Enrich campaign list with attributed backoffice data (strictly direct)
+    for c in meta_campaigns:
         c_id = c["id"]
         direct = direct_attributions.get(c_id, {"leads": 0, "approved": 0, "activated": 0})
         
-        c["dinx_leads"] = direct["leads"] + allocated_leads[idx]
-        c["dinx_approved"] = direct["approved"] + allocated_approved[idx]
-        c["dinx_activated"] = direct["activated"] + allocated_activated[idx]
+        c["dinx_leads"] = direct["leads"]
+        c["dinx_approved"] = direct["approved"]
+        c["dinx_activated"] = direct["activated"]
 
     # Meta Spends split
     total_spend = sum(c["spend"] for c in meta_campaigns)
@@ -278,7 +512,7 @@ def fetch_live_data():
             profile_visit_spend += c["spend"]
             
     aggregated_data = {
-        "last_updated": datetime.now().isoformat(),
+        "last_updated": raw_data.get("last_updated"),
         "dinx_stats": {
             "total_leads": dinx_totals,
             "qualificados": qualificados_count,
@@ -303,26 +537,7 @@ def fetch_live_data():
         }
     }
     
-    # Save cache to file
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(aggregated_data, f, ensure_ascii=False, indent=2)
-        
     return aggregated_data
-
-def get_cached_data(force=False):
-    if not force and os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # Check expiry
-            updated_time = datetime.fromisoformat(data["last_updated"])
-            if datetime.now() - updated_time < timedelta(minutes=CACHE_EXPIRY_MINUTES):
-                print(f"[{datetime.now().isoformat()}] Serving data from local cache (created {updated_time.isoformat()}).")
-                return data
-        except Exception as e:
-            print("Error reading cache:", e)
-            
-    return fetch_live_data()
 
 class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -337,20 +552,40 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
         
     def do_GET(self):
         parsed_url = urllib.parse.urlparse(self.path)
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        exclude_internal = query_params.get("exclude_internal", ["false"])[0].lower() == "true"
+        date_range = query_params.get("date_range", ["all"])[0].lower()
+        start_date = query_params.get("start_date", [None])[0]
+        end_date = query_params.get("end_date", [None])[0]
+
         if parsed_url.path == "/api/data":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            data = get_cached_data(force=False)
-            self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+            data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
+            response_payload = {
+                "status": "success",
+                "is_fetching": is_fetching,
+                "data": data
+            }
+            self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
         elif parsed_url.path == "/api/sync":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            data = get_cached_data(force=True)
-            self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+            
+            # Start background sync
+            start_background_fetch()
+            
+            data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
+            response_payload = {
+                "status": "syncing",
+                "is_fetching": True,
+                "data": data
+            }
+            self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
         else:
             # Fallback to serving static files from public/
             super().do_GET()
@@ -362,7 +597,11 @@ if not os.path.exists(PUBLIC_DIR):
 if __name__ == "__main__":
     # Perform initial fetch to verify connection and initialize cache
     try:
-        get_cached_data()
+        raw_data = load_raw_cache()
+        if not raw_data:
+            print("Initial cache initialization...")
+            raw_data = fetch_raw_live_data()
+            save_raw_cache(raw_data)
     except Exception as e:
         print("Initial data fetch warning:", e)
         
