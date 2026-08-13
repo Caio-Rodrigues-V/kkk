@@ -410,11 +410,35 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # Load raw data from cache
     raw_data = load_raw_cache()
     
-    # If no cache exists, do a synchronous fetch to initialize it
+    # If no cache exists, trigger background fetch and return empty defaults
     if not raw_data:
-        print("No raw cache found. Performing synchronous fetch...")
-        raw_data = fetch_raw_live_data()
-        save_raw_cache(raw_data)
+        print("No raw cache found. Triggering background fetch...")
+        start_background_fetch()
+        return {
+            "last_updated": None,
+            "dinx_stats": {
+                "total_leads": 0,
+                "qualificados": 0,
+                "qualificados_private": 0,
+                "ativados": 0,
+                "status_breakdown": {},
+                "school_breakdown": {},
+                "income_breakdown": {},
+                "device_breakdown": {},
+                "origin_breakdown": {},
+                "daily_trend": []
+            },
+            "meta_stats": {
+                "total_spend": 0.0,
+                "lead_campaign_spend": 0.0,
+                "profile_visit_spend": 0.0,
+                "campaigns": []
+            },
+            "ig_stats": {
+                "profile": {},
+                "media": []
+            }
+        }
     else:
         # Check if cache is expired (older than CACHE_EXPIRY_MINUTES)
         try:
@@ -719,15 +743,11 @@ if not os.path.exists(PUBLIC_DIR):
     os.makedirs(PUBLIC_DIR)
 
 if __name__ == "__main__":
-    # Perform initial fetch to verify connection and initialize cache
-    try:
-        raw_data = load_raw_cache()
-        if not raw_data:
-            print("Initial cache initialization...")
-            raw_data = fetch_raw_live_data()
-            save_raw_cache(raw_data)
-    except Exception as e:
-        print("Initial data fetch warning:", e)
+    # Check if raw cache exists
+    raw_data = load_raw_cache()
+    if not raw_data:
+        print("Initial cache initialization (triggering background)...")
+        start_background_fetch()
         
     print(f"Starting server on http://localhost:{PORT} ...")
     http.server.ThreadingHTTPServer.allow_reuse_address = True
