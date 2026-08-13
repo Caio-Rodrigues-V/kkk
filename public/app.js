@@ -566,7 +566,6 @@ function renderCampaignsTable() {
       <td class="px-6 py-4 text-right">${formatInteger(c.leads)}</td>
       <td class="px-6 py-4 text-right font-semibold">${formatInteger(c.dinx_leads)}</td>
       <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(c.dinx_approved)}</td>
-      <td class="px-6 py-4 text-right font-bold text-emerald-600">${formatInteger(c.dinx_activated)}</td>
       <td class="px-6 py-4 text-right text-slate-400 font-semibold">${c.leads > 0 ? formatCurrency(cpl) : '—'}</td>
       <td class="px-6 py-4 text-right font-extrabold text-orange-600">${c.dinx_approved > 0 ? formatCurrency(cpa) : '—'}</td>
     `;
