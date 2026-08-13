@@ -1,4 +1,5 @@
 cache.json
+raw_cache.json
 __pycache__/
 .env
 .idea/

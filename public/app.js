@@ -1,6 +1,10 @@
 // State Variables
 let dashboardData = null;
 let activeTab = 'overview';
+let excludeInternal = localStorage.getItem("exclude_internal") === "true";
+let dateRange = localStorage.getItem("date_range") || "all";
+let customStartDate = localStorage.getItem("custom_start_date") || "";
+let customEndDate = localStorage.getItem("custom_end_date") || "";
 
 // Pagination state for Meta Campaigns
 let campaignCurrentPage = 1;
@@ -54,6 +58,128 @@ document.addEventListener("DOMContentLoaded", () => {
       switchTab(targetTab);
     });
   });
+
+  // Checkbox for excluding internal users
+  const chkExcludeInternal = document.getElementById("chk-exclude-internal");
+  if (chkExcludeInternal) {
+    chkExcludeInternal.checked = excludeInternal;
+    chkExcludeInternal.addEventListener("change", (e) => {
+      excludeInternal = e.target.checked;
+      localStorage.setItem("exclude_internal", excludeInternal);
+      fetchDashboardData(false);
+    });
+  }
+
+  // Date Filter Dropdown Logic
+  const btnDateFilter = document.getElementById("btn-date-filter");
+  const dateDropdown = document.getElementById("date-filter-dropdown");
+  const selectedFilterText = document.getElementById("selected-filter");
+  const customDatePanel = document.getElementById("custom-date-panel");
+  const customStartInput = document.getElementById("custom-start-date");
+  const customEndInput = document.getElementById("custom-end-date");
+  const btnApplyCustom = document.getElementById("btn-apply-custom-date");
+  
+  const rangeLabels = {
+    all: "Todo o período",
+    "7days": "Últimos 7 dias",
+    "30days": "Últimos 30 dias",
+    thismonth: "Este mês",
+    lastmonth: "Mês passado",
+    custom: "Personalizado"
+  };
+
+  // Set initial values
+  if (customStartInput) customStartInput.value = customStartDate;
+  if (customEndInput) customEndInput.value = customEndDate;
+
+  // Format custom date for display
+  function formatCustomDateLabel(start, end) {
+    if (!start || !end) return "Personalizado";
+    const parseAndFormat = (dStr) => {
+      const parts = dStr.split('-');
+      return `${parts[2]}/${parts[1]}`;
+    };
+    return `${parseAndFormat(start)} a ${parseAndFormat(end)}`;
+  }
+
+  // Set initial text label
+  if (selectedFilterText) {
+    if (dateRange === "custom") {
+      selectedFilterText.textContent = formatCustomDateLabel(customStartDate, customEndDate);
+    } else {
+      selectedFilterText.textContent = rangeLabels[dateRange] || "Todo o período";
+    }
+  }
+
+  if (btnDateFilter && dateDropdown) {
+    btnDateFilter.addEventListener("click", (e) => {
+      e.stopPropagation();
+      dateDropdown.classList.toggle("hidden");
+      
+      // If panel is currently active, ensure customDatePanel visibility matches
+      if (dateRange === "custom") {
+        customDatePanel?.classList.remove("hidden");
+      } else {
+        customDatePanel?.classList.add("hidden");
+      }
+    });
+
+    // Close dropdown on click outside, but DO NOT close if clicked inside the custom date panel
+    document.addEventListener("click", (e) => {
+      if (dateDropdown && !dateDropdown.contains(e.target) && e.target !== btnDateFilter) {
+        dateDropdown.classList.add("hidden");
+      }
+    });
+
+    const options = document.querySelectorAll(".date-filter-opt");
+    options.forEach(opt => {
+      opt.addEventListener("click", (e) => {
+        e.stopPropagation(); // Prevent document click listener from firing
+        const selectedRange = opt.getAttribute("data-range");
+        
+        if (selectedRange === "custom") {
+          customDatePanel?.classList.toggle("hidden");
+        } else {
+          customDatePanel?.classList.add("hidden");
+          dateRange = selectedRange;
+          localStorage.setItem("date_range", dateRange);
+          if (selectedFilterText) {
+            selectedFilterText.textContent = rangeLabels[dateRange] || "Todo o período";
+          }
+          dateDropdown.classList.add("hidden");
+          fetchDashboardData(false);
+        }
+      });
+    });
+
+    if (btnApplyCustom) {
+      btnApplyCustom.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const startVal = customStartInput.value;
+        const endVal = customEndInput.value;
+        
+        if (!startVal || !endVal) {
+          alert("Por favor, preencha as datas de início e fim.");
+          return;
+        }
+        
+        dateRange = "custom";
+        customStartDate = startVal;
+        customEndDate = endVal;
+        
+        localStorage.setItem("date_range", dateRange);
+        localStorage.setItem("custom_start_date", customStartDate);
+        localStorage.setItem("custom_end_date", customEndDate);
+        
+        if (selectedFilterText) {
+          selectedFilterText.textContent = formatCustomDateLabel(customStartDate, customEndDate);
+        }
+        
+        dateDropdown.classList.add("hidden");
+        fetchDashboardData(false);
+      });
+    }
+  }
 
   // Sync / Refresh Button
   btnSyncEl.addEventListener("click", () => {
@@ -146,25 +272,54 @@ function switchTab(tabId) {
 
 // Fetch data from Python Server
 async function fetchDashboardData(forceSync = false) {
-  loadingOverlayEl.classList.add("active");
-  loadingOverlayEl.classList.remove("opacity-0", "pointer-events-none");
+  const isFirstLoad = (dashboardData === null);
+  
+  if (isFirstLoad) {
+    loadingOverlayEl.classList.add("active");
+    loadingOverlayEl.classList.remove("opacity-0", "pointer-events-none");
+  }
+  
   syncIconEl.classList.add("animate-spin");
   
-  const endpoint = forceSync ? "/api/sync" : "/api/data";
+  let endpoint = (forceSync ? "/api/sync" : "/api/data") + `?exclude_internal=${excludeInternal}&date_range=${dateRange}`;
+  if (dateRange === "custom") {
+    endpoint += `&start_date=${customStartDate}&end_date=${customEndDate}`;
+  }
   try {
     const response = await fetch(endpoint);
     if (!response.ok) throw new Error("Erro de rede");
-    dashboardData = await response.json();
+    const resPayload = await response.json();
+    
+    dashboardData = resPayload.data;
     
     // Update all views
     updateDashboardUI();
+    
+    // Check if background fetch is running
+    const syncTextEl = document.getElementById("sync-text");
+    if (resPayload.is_fetching) {
+      if (syncTextEl) syncTextEl.textContent = "Sincronizando...";
+      syncIconEl.classList.add("animate-spin");
+      btnSyncEl.disabled = true;
+      // Poll again in 3 seconds
+      setTimeout(() => {
+        fetchDashboardData(false);
+      }, 3000);
+    } else {
+      if (syncTextEl) syncTextEl.textContent = "Atualizar";
+      syncIconEl.classList.remove("animate-spin");
+      btnSyncEl.disabled = false;
+    }
   } catch (error) {
     console.error("Erro ao carregar dados:", error);
-    alert("Não foi possível carregar os dados das APIs. Certifique-se de que o backend está ativo.");
+    if (isFirstLoad) {
+      alert("Não foi possível carregar os dados das APIs. Certifique-se de que o backend está ativo.");
+    }
   } finally {
-    loadingOverlayEl.classList.remove("active");
-    loadingOverlayEl.classList.add("opacity-0", "pointer-events-none");
-    syncIconEl.classList.remove("animate-spin");
+    if (isFirstLoad) {
+      loadingOverlayEl.classList.remove("active");
+      loadingOverlayEl.classList.add("opacity-0", "pointer-events-none");
+    }
   }
 }
 
@@ -204,8 +359,6 @@ function renderOverviewTab() {
   document.getElementById("kpi-qualificados-private-pct").textContent = `${formatPercentage(qualPrivatePct)} do total`;
 
   document.getElementById("kpi-apps-ativados").textContent = formatInteger(ds.ativados);
-  const activePrivatePct = ds.qualificados_private > 0 ? (ds.ativados / ds.qualificados_private) : 0;
-  document.getElementById("kpi-apps-ativados-pct").textContent = `${formatPercentage(activePrivatePct)} dos particulares`;
 
   // Sub KPIs row
   document.getElementById("sub-taxa-qualif").textContent = formatPercentage(qualPrivatePct);
@@ -400,28 +553,7 @@ function renderDailyTab() {
   const chart = new ApexCharts(container, options);
   chart.render();
 
-  // Populate Daily stats Table (sorted descending)
-  const tbody = document.getElementById("daily-table-body");
-  tbody.innerHTML = "";
-  
-  const sortedTrendDesc = [...trend].reverse();
-  sortedTrendDesc.forEach(item => {
-    const tr = document.createElement("tr");
-    tr.className = "hover:bg-slate-50/50 transition-colors";
-    
-    const qualRate = item.cadastros > 0 ? (item.qualificados / item.cadastros) : 0;
-    const activeRate = item.qualificados > 0 ? (item.ativados / item.qualificados) : 0;
 
-    tr.innerHTML = `
-      <td class="px-6 py-4"><strong>${formatDate(item.date)}</strong></td>
-      <td class="px-6 py-4">${formatInteger(item.cadastros)}</td>
-      <td class="px-6 py-4">${formatInteger(item.qualificados)}</td>
-      <td class="px-6 py-4">${formatInteger(item.ativados)}</td>
-      <td class="px-6 py-4"><span class="text-orange-600 font-bold">${formatPercentage(qualRate)}</span></td>
-      <td class="px-6 py-4"><span class="text-emerald-600 font-bold">${formatPercentage(activeRate)}</span></td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
 // 3. Render Breakdown Demographics Tab
@@ -430,12 +562,10 @@ function renderBreakdownTab() {
 
   // Clear existing charts
   const schoolCont = document.getElementById("chart-school-breakdown");
-  const incomeCont = document.getElementById("chart-income-breakdown");
   const deviceCont = document.getElementById("chart-device-breakdown");
   const originCont = document.getElementById("chart-origin-breakdown");
 
   schoolCont.innerHTML = "";
-  incomeCont.innerHTML = "";
   deviceCont.innerHTML = "";
   originCont.innerHTML = "";
 
@@ -479,20 +609,6 @@ function renderBreakdownTab() {
   ];
   const schoolChart = new ApexCharts(schoolCont, getDoughnutOptions(schoolLabels, schoolSeries, ['#f97316', '#7c3aed', '#fb7185', '#94a3b8']));
   schoolChart.render();
-
-  // Income Range Breakdown
-  const incomeKeys = [
-    { key: "under2k", label: "Até R$ 2k" },
-    { key: "between2kAnd4k", label: "R$ 2k a 4k" },
-    { key: "between4kAnd12k", label: "R$ 4k a 12k" },
-    { key: "between12kAnd25k", label: "R$ 12k a 25k" },
-    { key: "over25k", label: "Acima de R$ 25k" },
-    { key: "notInformed", label: "Não Informado" }
-  ];
-  const incomeLabels = incomeKeys.map(k => k.label);
-  const incomeSeries = incomeKeys.map(k => ds.income_breakdown[k.key] || 0);
-  const incomeChart = new ApexCharts(incomeCont, getDoughnutOptions(incomeLabels, incomeSeries, ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#10b981', '#94a3b8']));
-  incomeChart.render();
 
   // Device Breakdown
   const deviceLabels = ["Android", "iOS", "Outro", "Não Informado"];
