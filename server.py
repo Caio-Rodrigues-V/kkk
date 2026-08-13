@@ -293,12 +293,18 @@ def fetch_raw_live_data():
     except Exception as e:
         print("Error fetching Instagram data:", e)
         
+    # 4. Fetch Redis mapping & Meta form leads mapping
+    redis_mapping = fetch_redis_mapping()
+    form_leads_mapping = fetch_meta_form_leads("2230521901040318")
+        
     return {
         "last_updated": datetime.now().isoformat(),
         "dinx_requests": dinx_requests,
         "meta_campaigns": meta_campaigns_by_preset,
         "ig_profile": ig_profile,
-        "ig_media": ig_media
+        "ig_media": ig_media,
+        "redis_mapping": redis_mapping,
+        "form_leads_mapping": form_leads_mapping
     }
 
 def save_raw_cache(raw_data):
@@ -516,11 +522,11 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # 5. Campaign Attribution Logic (Dinx Backoffice to Meta Campaigns)
     from urllib.parse import urlparse, parse_qs
     
-    # Load Redis mapping (email/phone -> lead_id)
-    redis_mapping = fetch_redis_mapping()
+    # Load Redis mapping (email/phone -> lead_id) from raw_data cache
+    redis_mapping = raw_data.get("redis_mapping", {})
     
-    # Load Meta form leads mapping (lead_id -> campaign_id)
-    form_leads_mapping = fetch_meta_form_leads("2230521901040318")
+    # Load Meta form leads mapping (lead_id -> campaign_id) from raw_data cache
+    form_leads_mapping = raw_data.get("form_leads_mapping", {})
     
     # Direct UTM campaign mapping: campaign_id -> { "leads": 0, "approved": 0, "activated": 0 }
     direct_attributions = {}
@@ -724,8 +730,8 @@ if __name__ == "__main__":
         print("Initial data fetch warning:", e)
         
     print(f"Starting server on http://localhost:{PORT} ...")
-    socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(("", PORT), DashboardAPIHandler) as httpd:
+    http.server.ThreadingHTTPServer.allow_reuse_address = True
+    with http.server.ThreadingHTTPServer(("", PORT), DashboardAPIHandler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
