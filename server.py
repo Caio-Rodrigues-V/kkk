@@ -55,10 +55,10 @@ def fetch_redis_mapping():
         conn = None
         if redis_url:
             print("Connecting to Redis via URL...")
-            conn = redis.Redis.from_url(redis_url, decode_responses=True)
+            conn = redis.Redis.from_url(redis_url, decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
         elif redis_host:
             print(f"Connecting to Redis via host {redis_host}...")
-            conn = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True)
+            conn = redis.Redis(host=redis_host, port=redis_port, password=redis_password, decode_responses=True, socket_timeout=5.0, socket_connect_timeout=5.0)
         else:
             print("No Redis configuration found in environment variables.")
             return {}
