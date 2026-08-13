@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dinx Growth Dashboard</title>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            dinx: {
+              purple: '#7c3aed',
+              pink: '#d946ef',
+              blue: '#3b82f6',
+              orange: '#f97316',
+              teal: '#10b981',
+              dark: '#120524',
+              violet: '#5b10a3'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- ApexCharts CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    /* Custom Scrollbar for modern feel */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen font-sans antialiased overflow-hidden">
+  <div class="flex h-screen w-screen overflow-hidden relative">
+    
+    <!-- Mobile Sidebar Backdrop (Only visible when sidebar is open on mobile) -->
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 hidden md:hidden transition-opacity duration-200"></div>
+
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 z-40 w-72 bg-gradient-to-b from-[#150727] to-[#4c0d8c] flex flex-col p-6 text-white transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl md:shadow-none flex-shrink-0">
+      
+      <!-- Logo Section -->
+      <div class="flex items-center gap-3 mb-8 pl-1">
+        <!-- Substitua o SVG abaixo pela imagem da sua logo, ex: <img src="logo.png" class="h-9 w-auto" alt="Logo"> -->
+        <div id="logo-container" class="flex-shrink-0">
+          <svg class="h-9 w-9" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#818cf8" />
+                <stop offset="50%" stop-color="#ec4899" />
+                <stop offset="100%" stop-color="#fb923c" />
+              </linearGradient>
+              <linearGradient id="d-grad" x1="0%" y1="100%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ffffff" />
+                <stop offset="100%" stop-color="#e2e8f0" />
+              </linearGradient>
+            </defs>
+            <rect width="40" height="40" rx="10" fill="#0f051c" />
+            <rect x="1" y="1" width="38" height="38" rx="9" fill="none" stroke="url(#logo-grad)" stroke-width="1.5" />
+            <rect x="23" y="11" width="4" height="18" rx="2" fill="url(#d-grad)" />
+            <circle cx="17" cy="20" r="6" fill="none" stroke="url(#d-grad)" stroke-width="4" />
+            <circle cx="17" cy="20" r="2.5" fill="#facc15" />
+          </svg>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-lg font-extrabold tracking-tight leading-none">dinx <span class="text-purple-300">Growth</span></span>
+          <span class="text-[10px] text-purple-200/60 font-semibold tracking-wider uppercase mt-0.5">Dashboard</span>
+        </div>
+      </div>
+      
+      <!-- Menu Navigation -->
+      <nav class="flex flex-col gap-2 flex-grow">
+        <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left active" data-tab="overview">
+          <i data-lucide="layout-dashboard" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
+          <div class="flex flex-col leading-tight">
+            <span class="text-sm font-semibold text-white">Dashboard</span>
+            <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Métricas principais</span>
+          </div>
+        </button>
+        <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left" data-tab="journey">
+          <i data-lucide="trending-up" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
+          <div class="flex flex-col leading-tight">
+            <span class="text-sm font-semibold text-white">Jornada do Lead</span>
+            <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Do cadastro à ativação</span>
+          </div>
+        </button>
+        <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left" data-tab="campaigns">
+          <i data-lucide="megaphone" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
+          <div class="flex flex-col leading-tight">
+            <span class="text-sm font-semibold text-white">Campanhas Meta</span>
+            <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Anúncios e qualificados</span>
+          </div>
+        </button>
+      </nav>
+      
+      <!-- Footer -->
+      <div class="pt-4 border-t border-white/10 text-center">
+        <span class="text-[10px] text-purple-300/40 font-bold uppercase tracking-widest">Powered by Dinx</span>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel -->
+    <main class="flex-grow flex flex-col h-full overflow-hidden">
+      <!-- Top Header Bar -->
+      <header class="bg-white border-b border-slate-100 h-16 md:h-20 flex items-center justify-between px-6 md:px-10 flex-shrink-0 z-20 shadow-sm shadow-slate-100/40">
+        <div class="flex items-center gap-3">
+          <!-- Toggle Sidebar Hamburger Button (Mobile Only) -->
+          <button id="btn-toggle-sidebar" class="p-2 -ml-2 rounded-lg text-slate-500 hover:bg-slate-50 md:hidden transition-colors" title="Abrir menu">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+          
+          <div class="hidden sm:flex items-center gap-3">
+            <div class="flex flex-col">
+              <div class="flex items-baseline gap-2">
+                <span class="text-sm font-bold text-slate-800">dinx <span class="text-purple-600">Growth</span></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-medium">Campanhas de aquisição · desde o primeiro convite</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <span class="hidden xs:inline-block text-xs font-semibold bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-full border border-emerald-100" id="sync-time">Atualizado --/--/----</span>
+          <div class="flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/60 px-3 py-2 rounded-lg text-xs font-bold text-slate-700 cursor-pointer transition-colors">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
+            <span id="selected-filter">Todos os convites</span>
+          </div>
+          <button class="bg-white hover:bg-orange-50 border border-orange-200 text-orange-600 px-3.5 py-2 rounded-lg text-xs font-bold flex items-center gap-2 cursor-pointer transition-all active:scale-[0.98]" id="btn-sync" title="Sincronizar dados">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="sync-icon"></i>
+            <span>Atualizar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Pages View Scrollable Container -->
+      <div class="flex-grow p-6 md:p-10 overflow-y-auto relative">
+        
+        <!-- LOADING SPINNER OVERLAY -->
+        <div id="loading-overlay" class="absolute inset-0 bg-slate-50/90 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4 opacity-0 pointer-events-none transition-opacity duration-300">
+          <div class="w-10 h-10 border-4 border-purple-100 border-t-purple-600 rounded-full animate-spin"></div>
+          <p class="text-sm font-bold text-slate-500">Carregando dados das APIs de Growth...</p>
+        </div>
+
+        <!-- 1. OVERVIEW PAGE -->
+        <div id="page-overview" class="tab-page active hidden space-y-8">
+          <div>
+            <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Overview</h1>
+            <p class="text-xs text-slate-500 mt-1">KPIs, funil e evolução das campanhas no período selecionado.</p>
+          </div>
+
+          <!-- FUNNEL CARD SYSTEM -->
+          <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+            <div class="flex flex-col gap-0.5 mb-6">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Funil de Aquisição</span>
+              <h2 class="text-base font-extrabold text-slate-800">Jornada do lead</h2>
+            </div>
+            
+            <!-- Cards Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 mb-5">
+              <!-- Card 1: Leads Spend -->
+              <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition-all duration-200">
+                <div class="absolute top-0 inset-x-0 h-1 bg-purple-500"></div>
+                <div class="flex items-center gap-2 mb-3">
+                  <div class="p-1.5 rounded-lg bg-purple-50 text-purple-600">
+                    <i data-lucide="wallet" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">INVESTIDO - LEADS</span>
+                </div>
+                <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="kpi-investido-leads">R$ 0,00</div>
+              </div>
+              
+              <!-- Card 2: Profile Visit Spend -->
+              <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition-all duration-200">
+                <div class="absolute top-0 inset-x-0 h-1 bg-pink-500"></div>
+                <div class="flex items-center gap-2 mb-3">
+                  <div class="p-1.5 rounded-lg bg-pink-50 text-pink-600">
+                    <i data-lucide="instagram" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">INVESTIDO - MARCA</span>
+                </div>
+                <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="kpi-investido-outros">R$ 0,00</div>
+                <div class="text-[10px] text-slate-400 font-semibold mt-1" id="kpi-investido-total">Total R$ 0,00</div>
+              </div>
+              
+              <!-- Card 3: Leads Totais -->
+              <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition-all duration-200">
+                <div class="absolute top-0 inset-x-0 h-1 bg-blue-500"></div>
+                <div class="flex items-center gap-2 mb-3">
+                  <div class="p-1.5 rounded-lg bg-blue-50 text-blue-600">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">LEADS TOTAIS</span>
+                </div>
+                <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="kpi-leads-totais">0</div>
+                <div class="text-[10px] text-slate-400 font-semibold mt-1">Cadastros no período</div>
+              </div>
+              
+              <!-- Card 4: Qualificados Private -->
+              <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition-all duration-200">
+                <div class="absolute top-0 inset-x-0 h-1 bg-orange-500"></div>
+                <div class="flex items-center gap-2 mb-3">
+                  <div class="p-1.5 rounded-lg bg-orange-50 text-orange-600">
+                    <i data-lucide="graduation-cap" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">QUALIFICADOS (PART.)</span>
+                </div>
+                <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="kpi-qualificados-private">0</div>
+                <div class="text-[10px] text-slate-400 font-semibold mt-1" id="kpi-qualificados-private-pct">0,00% do total</div>
+              </div>
+              
+              <!-- Card 5: Apps Ativados -->
+              <div class="bg-slate-50/50 border border-slate-100 rounded-xl p-5 relative overflow-hidden group hover:shadow-md transition-all duration-200">
+                <div class="absolute top-0 inset-x-0 h-1 bg-emerald-500"></div>
+                <div class="flex items-center gap-2 mb-3">
+                  <div class="p-1.5 rounded-lg bg-emerald-50 text-emerald-600">
+                    <i data-lucide="smartphone" class="w-4 h-4"></i>
+                  </div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">APPS ATIVADOS</span>
+                </div>
+                <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="kpi-apps-ativados">0</div>
+                <div class="text-[10px] text-slate-400 font-semibold mt-1" id="kpi-apps-ativados-pct">0,00% dos part.</div>
+              </div>
+            </div>
+
+            <!-- Sub KPIs Row -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="bg-slate-50/40 border border-slate-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="text-orange-500">
+                    <i data-lucide="percent" class="w-4.5 h-4.5"></i>
+                  </div>
+                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">TAXA DE QUALIFICAÇÃO (PARTICULAR)</span>
+                </div>
+                <div class="flex flex-col items-end">
+                  <span class="text-base font-extrabold text-slate-800" id="sub-taxa-qualif">0,00%</span>
+                  <span class="text-[10px] text-slate-400 font-semibold mt-0.5" id="sub-taxa-qualif-det">0 / 0</span>
+                </div>
+              </div>
+              
+              <div class="bg-slate-50/40 border border-slate-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div class="flex items-center gap-3">
+                  <div class="text-purple-600">
+                    <i data-lucide="dollar-sign" class="w-4.5 h-4.5"></i>
+                  </div>
+                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">CUSTO POR LEAD QUALIFICADO (PART.)</span>
+                </div>
+                <div class="flex flex-col items-end">
+                  <span class="text-base font-extrabold text-slate-800" id="sub-cpl-qualif">R$ 0,00</span>
+                  <span class="text-[10px] text-slate-400 font-semibold mt-0.5" id="sub-cpl-qualif-det">R$ 0,00 / 0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trend & CPA Row -->
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Chart Card -->
+            <div class="lg:col-span-2 bg-white border border-slate-100 rounded-2xl shadow-sm flex flex-col">
+              <div class="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex flex-col">
+                  <h3 class="text-sm font-extrabold text-slate-800">Evolução por Dia</h3>
+                  <span class="text-xs text-slate-400">Cadastros e níveis de qualificação nos últimos 30 dias</span>
+                </div>
+                <!-- Custom Legend -->
+                <div class="flex gap-4">
+                  <span class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-600"></span> Cadastros
+                  </span>
+                  <span class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                    <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span> Qualificados Total
+                  </span>
+                  <span class="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Ativados
+                  </span>
+                </div>
+              </div>
+              <div class="p-6 flex-grow">
+                <div id="overview-trend-chart" class="h-80 w-100"></div>
+              </div>
+            </div>
+
+            <!-- Right CPA Circular Card -->
+            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col items-center justify-center">
+              <div class="w-full text-left mb-4">
+                <h3 class="text-sm font-extrabold text-slate-800">CPA Qualificado</h3>
+                <span class="text-xs text-slate-400">Métricas globais de eficiência de custo</span>
+              </div>
+              
+              <div class="flex-grow flex flex-col items-center justify-center py-2 w-full">
+                <!-- Radial Chart Wrapper -->
+                <div id="cpa-radial-chart" class="h-44 flex items-center justify-center"></div>
+                
+                <div class="text-center mt-2 mb-6">
+                  <div class="text-3xl font-extrabold text-orange-600 tracking-tight" id="cpa-value-text">R$ 0,00</div>
+                  <div class="text-[9px] font-bold text-slate-400 tracking-wider uppercase mt-1">CPA QUALIFICADO GLOBAL</div>
+                  <div class="text-xs text-slate-500 font-semibold mt-1" id="cpa-formula-text">R$ 0,00 / 0</div>
+                </div>
+                
+                <div class="w-full border-t border-dashed border-slate-100 pt-5 text-center">
+                  <div class="text-[9px] font-bold text-slate-400 tracking-wider uppercase mb-1">QUALIFICADOS 1 / CADASTROS</div>
+                  <div class="text-base font-extrabold text-slate-800" id="cpa-ratio-text">0 / 0</div>
+                  <div class="text-xs font-bold text-purple-600 mt-0.5" id="cpa-ratio-pct">0,00% qualif.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. LEAD JOURNEY PAGE -->
+        <div id="page-journey" class="tab-page hidden space-y-8">
+          <div>
+            <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Jornada do Lead</h1>
+            <p class="text-xs text-slate-500 mt-1">Acompanhamento do funil de conversão, evolução diária e distribuição demográfica dos leads no backoffice.</p>
+          </div>
+
+          <!-- Daily detail line chart -->
+          <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
+            <div class="mb-4">
+              <h3 class="text-sm font-extrabold text-slate-800">Histórico de Performance</h3>
+              <span class="text-xs text-slate-400">Linha do tempo diária desde o primeiro convite</span>
+            </div>
+            <div id="daily-detail-chart" class="h-[400px] w-full"></div>
+          </div>
+
+          <!-- Demographics breakdown grid -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- School Type -->
+            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
+              <div class="mb-6">
+                <h3 class="text-sm font-extrabold text-slate-800">Tipo de Escola</h3>
+                <span class="text-xs text-slate-400">Escola Pública vs Particular vs Bolsista</span>
+              </div>
+              <div class="flex-grow flex items-center justify-center min-h-[280px]">
+                <div id="chart-school-breakdown" class="w-full max-w-[320px]"></div>
+              </div>
+            </div>
+
+            <!-- Income Range -->
+            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
+              <div class="mb-6">
+                <h3 class="text-sm font-extrabold text-slate-800">Faixa de Renda</h3>
+                <span class="text-xs text-slate-400">Declaração de renda familiar</span>
+              </div>
+              <div class="flex-grow flex items-center justify-center min-h-[280px]">
+                <div id="chart-income-breakdown" class="w-full max-w-[320px]"></div>
+              </div>
+            </div>
+
+            <!-- Device Type -->
+            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
+              <div class="mb-6">
+                <h3 class="text-sm font-extrabold text-slate-800">Tipo de Dispositivo / Canal</h3>
+                <span class="text-xs text-slate-400">Distribuição iOS vs Android</span>
+              </div>
+              <div class="flex-grow flex items-center justify-center min-h-[280px]">
+                <div id="chart-device-breakdown" class="w-full max-w-[320px]"></div>
+              </div>
+            </div>
+
+            <!-- Lead Origin -->
+            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
+              <div class="mb-6">
+                <h3 class="text-sm font-extrabold text-slate-800">Origem de Cadastro</h3>
+                <span class="text-xs text-slate-400">De onde vieram os leads registrados</span>
+              </div>
+              <div class="flex-grow flex items-center justify-center min-h-[280px]">
+                <div id="chart-origin-breakdown" class="w-full max-w-[320px]"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Daily detail Stats Table -->
+          <div class="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+            <div class="p-6 border-b border-slate-100">
+              <h3 class="text-sm font-extrabold text-slate-800">Tabela Diária</h3>
+              <span class="text-xs text-slate-400">Números absolutos e taxas de conversão diárias</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs md:text-sm">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                    <th class="px-6 py-4">Data</th>
+                    <th class="px-6 py-4">Cadastros (Total)</th>
+                    <th class="px-6 py-4">Qualificados</th>
+                    <th class="px-6 py-4">Ativados</th>
+                    <th class="px-6 py-4 text-orange-600">Taxa de Qualificação</th>
+                    <th class="px-6 py-4 text-emerald-600">Taxa de Ativação</th>
+                  </tr>
+                </thead>
+                <tbody id="daily-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. META CAMPAIGNS PAGE -->
+        <div id="page-campaigns" class="tab-page hidden space-y-8">
+          <div>
+            <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Campanhas Meta Ads</h1>
+            <p class="text-xs text-slate-500 mt-1">Desempenho de investimento cruzado com os dados de cadastros atribuídos no backoffice da Dinx.</p>
+          </div>
+
+          <!-- Table Controls Filter Card -->
+          <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 bg-slate-50 border border-slate-200/60 px-4 py-2.5 rounded-xl w-full sm:max-w-md focus-within:border-purple-500 focus-within:bg-white transition-all duration-200">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400"></i>
+              <input type="text" id="campaign-search" class="bg-transparent border-none outline-none text-xs md:text-sm font-semibold text-slate-700 w-full placeholder-slate-400" placeholder="Buscar campanhas por nome...">
+            </div>
+            
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
+              <span class="text-xs font-bold text-slate-400 uppercase tracking-wide">Status:</span>
+              <div class="flex bg-slate-50 border border-slate-200/60 p-1 rounded-xl">
+                <button class="btn-filter px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 transition-all duration-200 active" data-status="ALL">Todos</button>
+                <button class="btn-filter px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 transition-all duration-200" data-status="ACTIVE">Ativos</button>
+                <button class="btn-filter px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 transition-all duration-200" data-status="PAUSED">Pausados</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table Card -->
+          <div class="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs md:text-sm" id="campaigns-table">
+                <thead>
+                  <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                    <th class="px-6 py-4">Campanha</th>
+                    <th class="px-6 py-4">Status</th>
+                    <th class="px-6 py-4 text-right">Investimento</th>
+                    <th class="px-6 py-4 text-right">Leads (Meta)</th>
+                    <th class="px-6 py-4 text-right">Leads (Dinx)</th>
+                    <th class="px-6 py-4 text-right text-orange-600">Qualificados</th>
+                    <th class="px-6 py-4 text-right text-emerald-600">Ativados</th>
+                    <th class="px-6 py-4 text-right">CPL (Meta)</th>
+                    <th class="px-6 py-4 text-right text-orange-600">CPA (Dinx)</th>
+                  </tr>
+                </thead>
+                <tbody id="campaigns-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+                  <!-- Injected via JS -->
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Table Pagination -->
+            <div class="flex items-center justify-between px-6 py-4 border-t border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wide" id="table-pagination">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Javascript Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
