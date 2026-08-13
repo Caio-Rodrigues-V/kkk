@@ -10,7 +10,7 @@ import sys
 # Ensure UTF-8 console output
 sys.stdout.reconfigure(encoding='utf-8')
 
-PORT = 8000
+PORT = int(os.environ.get("PORT", 8000))
 PUBLIC_DIR = os.path.join(os.path.dirname(__file__), "public")
 CACHE_FILE = os.path.join(os.path.dirname(__file__), "cache.json")
 CACHE_EXPIRY_MINUTES = 15
