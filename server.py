@@ -93,7 +93,7 @@ def fetch_meta_form_leads(form_id):
         url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id&limit=1000&access_token={META_ACCESS_TOKEN}"
         while url:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req) as resp:
+            with urllib.request.urlopen(req, timeout=15.0) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
                 for lead in res.get("data", []):
                     l_id = lead.get("id")
@@ -118,6 +118,45 @@ def get_campaign_for_lead(lead_id, form_leads_mapping):
 CUSTOM_META_CACHE = {}  # Key: "start_date:end_date", Value: (timestamp, campaigns_list)
 CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
 
+def fetch_meta_campaigns_metadata():
+    campaigns_meta = {}
+    try:
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=150&access_token={META_ACCESS_TOKEN}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            for c in res.get("data", []):
+                campaigns_meta[c["id"]] = c
+    except Exception as e:
+        print("Error fetching Meta Campaigns metadata:", e)
+    return campaigns_meta
+
+def fetch_meta_adsets_metadata():
+    adsets_meta = {}
+    try:
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/adsets?fields=name,status,effective_status,campaign_id&limit=150&access_token={META_ACCESS_TOKEN}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            for a in res.get("data", []):
+                adsets_meta[a["id"]] = a
+    except Exception as e:
+        print("Error fetching Meta Adsets metadata:", e)
+    return adsets_meta
+
+def fetch_meta_ads_metadata():
+    ads_meta = {}
+    try:
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url}}&limit=150&access_token={META_ACCESS_TOKEN}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=15.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            for a in res.get("data", []):
+                ads_meta[a["id"]] = a
+    except Exception as e:
+        print("Error fetching Meta Ads metadata:", e)
+    return ads_meta
+
 def get_custom_meta_campaigns(start_date, end_date):
     key = f"{start_date}:{end_date}"
     now = datetime.now()
@@ -129,20 +168,11 @@ def get_custom_meta_campaigns(start_date, end_date):
             
     meta_campaigns = []
     try:
-        # Get campaigns metadata (status, effective_status)
-        url_c = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=100&access_token={META_ACCESS_TOKEN}"
-        req_c = urllib.request.Request(url_c, headers={"User-Agent": "Mozilla/5.0"})
-        campaigns_meta = {}
-        with urllib.request.urlopen(req_c) as resp:
-            campaigns_res = json.loads(resp.read().decode("utf-8"))
-            for c in campaigns_res.get("data", []):
-                campaigns_meta[c["id"]] = c
-                
-        # Get insights with custom range
+        campaigns_meta = fetch_meta_campaigns_metadata()
         time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
         url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&time_range={time_range}&limit=100&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_i) as resp:
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
             meta_insights = insights_res.get("data", [])
             
@@ -176,31 +206,19 @@ def get_custom_meta_campaigns(start_date, end_date):
         
     return meta_campaigns
 
-def fetch_meta_campaigns(preset):
+def fetch_meta_campaigns(preset, campaigns_meta):
     meta_campaigns = []
     try:
-        # Get campaigns metadata (status, effective_status)
-        url_c = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=100&access_token={META_ACCESS_TOKEN}"
-        req_c = urllib.request.Request(url_c, headers={"User-Agent": "Mozilla/5.0"})
-        campaigns_meta = {}
-        with urllib.request.urlopen(req_c) as resp:
-            campaigns_res = json.loads(resp.read().decode("utf-8"))
-            for c in campaigns_res.get("data", []):
-                campaigns_meta[c["id"]] = c
-                
-        # Get insights with the specific date_preset
         url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset={preset}&limit=100&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_i) as resp:
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
             meta_insights = insights_res.get("data", [])
             
-        # Merge them
         for item in meta_insights:
             c_id = item.get("campaign_id")
             meta_info = campaigns_meta.get(c_id, {})
             
-            # Find lead count
             leads = 0
             for action in item.get("actions", []):
                 if action.get("action_type") == "lead":
@@ -225,6 +243,185 @@ def fetch_meta_campaigns(preset):
         print(f"Error fetching Meta Ads data for preset '{preset}':", e)
     return meta_campaigns
 
+def fetch_meta_adsets(preset, adsets_meta):
+    adsets = []
+    try:
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&date_preset={preset}&limit=150&access_token={META_ACCESS_TOKEN}"
+        req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
+            insights_res = json.loads(resp.read().decode("utf-8"))
+            insights_data = insights_res.get("data", [])
+            
+        for item in insights_data:
+            a_id = item.get("adset_id")
+            meta_info = adsets_meta.get(a_id, {})
+            if not meta_info:
+                continue
+            
+            leads = 0
+            for action in item.get("actions", []):
+                if action.get("action_type") == "lead":
+                    leads = int(action.get("value", 0))
+                    break
+                    
+            adsets.append({
+                "id": a_id,
+                "name": meta_info.get("name"),
+                "status": meta_info.get("status", "PAUSED"),
+                "effective_status": meta_info.get("effective_status", "PAUSED"),
+                "campaign_id": meta_info.get("campaign_id"),
+                "spend": float(item.get("spend", 0.0)),
+                "impressions": int(item.get("impressions", 0)),
+                "clicks": int(item.get("clicks", 0)),
+                "leads": leads
+            })
+        print(f"Fetched {len(adsets)} adsets for preset '{preset}'.")
+    except Exception as e:
+        print(f"Error fetching Meta Ads adsets for preset '{preset}':", e)
+    return adsets
+
+def fetch_meta_ads(preset, ads_meta):
+    ads = []
+    try:
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=ad&fields=ad_id,spend,impressions,clicks,actions&date_preset={preset}&limit=150&access_token={META_ACCESS_TOKEN}"
+        req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
+            insights_res = json.loads(resp.read().decode("utf-8"))
+            insights_data = insights_res.get("data", [])
+            
+        for item in insights_data:
+            ad_id = item.get("ad_id")
+            meta_info = ads_meta.get(ad_id, {})
+            if not meta_info:
+                continue
+                
+            leads = 0
+            for action in item.get("actions", []):
+                if action.get("action_type") == "lead":
+                    leads = int(action.get("value", 0))
+                    break
+                    
+            creative = meta_info.get("creative", {})
+            thumbnail_url = creative.get("thumbnail_url", "")
+            
+            ads.append({
+                "id": ad_id,
+                "name": meta_info.get("name"),
+                "status": meta_info.get("status", "PAUSED"),
+                "effective_status": meta_info.get("effective_status", "PAUSED"),
+                "campaign_id": meta_info.get("campaign_id"),
+                "adset_id": meta_info.get("adset_id"),
+                "thumbnail_url": thumbnail_url,
+                "spend": float(item.get("spend", 0.0)),
+                "impressions": int(item.get("impressions", 0)),
+                "clicks": int(item.get("clicks", 0)),
+                "leads": leads
+            })
+        print(f"Fetched {len(ads)} ads for preset '{preset}'.")
+    except Exception as e:
+        print(f"Error fetching Meta Ads ads for preset '{preset}':", e)
+    return ads
+
+CUSTOM_META_ADSETS_CACHE = {}
+def get_custom_meta_adsets(start_date, end_date):
+    key = f"{start_date}:{end_date}"
+    now = datetime.now()
+    if key in CUSTOM_META_ADSETS_CACHE:
+        cache_time, data = CUSTOM_META_ADSETS_CACHE[key]
+        if now - cache_time < CUSTOM_META_CACHE_EXPIRY:
+            return data
+            
+    adsets = []
+    try:
+        adsets_meta = fetch_meta_adsets_metadata()
+        time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&time_range={time_range}&limit=150&access_token={META_ACCESS_TOKEN}"
+        req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
+            insights_res = json.loads(resp.read().decode("utf-8"))
+            insights_data = insights_res.get("data", [])
+            
+        for item in insights_data:
+            a_id = item.get("adset_id")
+            meta_info = adsets_meta.get(a_id, {})
+            if not meta_info:
+                continue
+            
+            leads = 0
+            for action in item.get("actions", []):
+                if action.get("action_type") == "lead":
+                    leads = int(action.get("value", 0))
+                    break
+                    
+            adsets.append({
+                "id": a_id,
+                "name": meta_info.get("name"),
+                "status": meta_info.get("status", "PAUSED"),
+                "effective_status": meta_info.get("effective_status", "PAUSED"),
+                "campaign_id": meta_info.get("campaign_id"),
+                "spend": float(item.get("spend", 0.0)),
+                "impressions": int(item.get("impressions", 0)),
+                "clicks": int(item.get("clicks", 0)),
+                "leads": leads
+            })
+        print(f"Fetched {len(adsets)} adsets for custom range {start_date} to {end_date}.")
+        CUSTOM_META_ADSETS_CACHE[key] = (now, adsets)
+    except Exception as e:
+        print(f"Error fetching Meta Ads adsets for custom range {start_date} to {end_date}:", e)
+    return adsets
+
+CUSTOM_META_ADS_CACHE = {}
+def get_custom_meta_ads(start_date, end_date):
+    key = f"{start_date}:{end_date}"
+    now = datetime.now()
+    if key in CUSTOM_META_ADS_CACHE:
+        cache_time, data = CUSTOM_META_ADS_CACHE[key]
+        if now - cache_time < CUSTOM_META_CACHE_EXPIRY:
+            return data
+            
+    ads = []
+    try:
+        ads_meta = fetch_meta_ads_metadata()
+        time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=ad&fields=ad_id,spend,impressions,clicks,actions&time_range={time_range}&limit=150&access_token={META_ACCESS_TOKEN}"
+        req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_i, timeout=15.0) as resp:
+            insights_res = json.loads(resp.read().decode("utf-8"))
+            insights_data = insights_res.get("data", [])
+            
+        for item in insights_data:
+            ad_id = item.get("ad_id")
+            meta_info = ads_meta.get(ad_id, {})
+            if not meta_info:
+                continue
+                
+            leads = 0
+            for action in item.get("actions", []):
+                if action.get("action_type") == "lead":
+                    leads = int(action.get("value", 0))
+                    break
+                    
+            creative = meta_info.get("creative", {})
+            thumbnail_url = creative.get("thumbnail_url", "")
+            
+            ads.append({
+                "id": ad_id,
+                "name": meta_info.get("name"),
+                "status": meta_info.get("status", "PAUSED"),
+                "effective_status": meta_info.get("effective_status", "PAUSED"),
+                "campaign_id": meta_info.get("campaign_id"),
+                "adset_id": meta_info.get("adset_id"),
+                "thumbnail_url": thumbnail_url,
+                "spend": float(item.get("spend", 0.0)),
+                "impressions": int(item.get("impressions", 0)),
+                "clicks": int(item.get("clicks", 0)),
+                "leads": leads
+            })
+        print(f"Fetched {len(ads)} ads for custom range {start_date} to {end_date}.")
+        CUSTOM_META_ADS_CACHE[key] = (now, ads)
+    except Exception as e:
+        print(f"Error fetching Meta Ads ads for custom range {start_date} to {end_date}:", e)
+
 def fetch_raw_live_data():
     print(f"[{datetime.now().isoformat()}] Fetching live data from Dinx and Meta APIs...")
     
@@ -241,15 +438,23 @@ def fetch_raw_live_data():
             },
             method="POST"
         )
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=15.0) as resp:
             dinx_res = json.loads(resp.read().decode("utf-8"))
             dinx_requests = dinx_res.get("requests", [])
             print(f"Fetched {len(dinx_requests)} leads from Dinx API.")
     except Exception as e:
         print("Error fetching Dinx data:", e)
         
-    # 2. Fetch Meta Ads Campaigns for different presets
+    # 2. Fetch Meta Ads Campaigns, Adsets, and Ads for different presets
     meta_campaigns_by_preset = {}
+    meta_adsets_by_preset = {}
+    meta_ads_by_preset = {}
+    
+    # Fetch metadata once
+    campaigns_meta = fetch_meta_campaigns_metadata()
+    adsets_meta = fetch_meta_adsets_metadata()
+    ads_meta = fetch_meta_ads_metadata()
+    
     presets_map = {
         "all": "maximum",
         "7days": "last_7d",
@@ -258,7 +463,9 @@ def fetch_raw_live_data():
         "lastmonth": "last_month"
     }
     for range_key, preset in presets_map.items():
-        meta_campaigns_by_preset[range_key] = fetch_meta_campaigns(preset)
+        meta_campaigns_by_preset[range_key] = fetch_meta_campaigns(preset, campaigns_meta)
+        meta_adsets_by_preset[range_key] = fetch_meta_adsets(preset, adsets_meta)
+        meta_ads_by_preset[range_key] = fetch_meta_ads(preset, ads_meta)
 
     # 3. Fetch Instagram profile & media
     ig_profile = {}
@@ -267,13 +474,13 @@ def fetch_raw_live_data():
         # Profile
         url_p = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}?fields=username,name,profile_picture_url,followers_count,media_count,biography,website&access_token={META_ACCESS_TOKEN}"
         req_p = urllib.request.Request(url_p, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_p) as resp:
+        with urllib.request.urlopen(req_p, timeout=15.0) as resp:
             ig_profile = json.loads(resp.read().decode("utf-8"))
             
         # Media posts
         url_m = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&limit=6&access_token={META_ACCESS_TOKEN}"
         req_m = urllib.request.Request(url_m, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_m) as resp:
+        with urllib.request.urlopen(req_m, timeout=15.0) as resp:
             ig_media_res = json.loads(resp.read().decode("utf-8"))
             ig_media = ig_media_res.get("data", [])
         print("Fetched Instagram profile and recent media.")
@@ -288,6 +495,8 @@ def fetch_raw_live_data():
         "last_updated": datetime.now().isoformat(),
         "dinx_requests": dinx_requests,
         "meta_campaigns": meta_campaigns_by_preset,
+        "meta_adsets": meta_adsets_by_preset,
+        "meta_ads": meta_ads_by_preset,
         "ig_profile": ig_profile,
         "ig_media": ig_media,
         "redis_mapping": redis_mapping,
@@ -419,7 +628,9 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                 "total_spend": 0.0,
                 "lead_campaign_spend": 0.0,
                 "profile_visit_spend": 0.0,
-                "campaigns": []
+                "campaigns": [],
+                "adsets": [],
+                "ads": []
             },
             "ig_stats": {
                 "profile": {},
@@ -440,6 +651,8 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # Perform the aggregations and attribution calculation dynamically on the raw_data
     dinx_requests_raw = raw_data.get("dinx_requests", [])
     meta_campaigns_raw_all = raw_data.get("meta_campaigns", {})
+    meta_adsets_raw_all = raw_data.get("meta_adsets", {})
+    meta_ads_raw_all = raw_data.get("meta_ads", {})
     ig_profile = raw_data.get("ig_profile", {})
     ig_media = raw_data.get("ig_media", [])
 
@@ -632,6 +845,32 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
         c["dinx_approved"] = direct["approved"]
         c["dinx_activated"] = direct["activated"]
 
+    # Load Meta Adsets for the requested date_range
+    meta_adsets_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_adsets_raw = get_custom_meta_adsets(start_date, end_date)
+    elif isinstance(meta_adsets_raw_all, dict):
+        meta_adsets_raw = meta_adsets_raw_all.get(date_range, [])
+    else:
+        meta_adsets_raw = []
+        
+    meta_adsets = []
+    for a in meta_adsets_raw:
+        meta_adsets.append(dict(a))
+        
+    # Load Meta Ads for the requested date_range
+    meta_ads_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_ads_raw = get_custom_meta_ads(start_date, end_date)
+    elif isinstance(meta_ads_raw_all, dict):
+        meta_ads_raw = meta_ads_raw_all.get(date_range, [])
+    else:
+        meta_ads_raw = []
+        
+    meta_ads = []
+    for ad in meta_ads_raw:
+        meta_ads.append(dict(ad))
+
     # Meta Spends split
     total_spend = sum(c["spend"] for c in meta_campaigns)
     
@@ -664,7 +903,9 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
             "total_spend": total_spend,
             "lead_campaign_spend": lead_campaign_spend,
             "profile_visit_spend": profile_visit_spend,
-            "campaigns": meta_campaigns
+            "campaigns": meta_campaigns,
+            "adsets": meta_adsets,
+            "ads": meta_ads
         },
         "ig_stats": {
             "profile": ig_profile,

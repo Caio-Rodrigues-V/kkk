@@ -357,8 +357,12 @@ function updateDashboardUI() {
   if (!dashboardData) return;
 
   // 1. Header updated time
-  const updatedDate = new Date(dashboardData.last_updated);
-  syncTimeEl.textContent = `Atualizado ${formatDate(updatedDate)} às ${updatedDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+  if (dashboardData.last_updated) {
+    const updatedDate = new Date(dashboardData.last_updated);
+    syncTimeEl.textContent = `Atualizado ${formatDate(dashboardData.last_updated)} às ${updatedDate.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'})}`;
+  } else {
+    syncTimeEl.textContent = "Atualizado --/--/----";
+  }
 
   // 2. Render Overview Tab
   renderOverviewTab();
