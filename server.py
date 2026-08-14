@@ -63,49 +63,74 @@ def fetch_redis_mapping():
             print("No Redis configuration found in environment variables.")
             return {}
             
-        for key in conn.scan_iter("*"):
-            try:
-                val_str = conn.get(key)
+        print("Scanning all keys in Redis...")
+        keys = list(conn.scan_iter("*"))
+        print(f"Found {len(keys)} keys in Redis. Fetching values in batches...")
+        
+        chunk_size = 1000
+        for i in range(0, len(keys), chunk_size):
+            chunk_keys = keys[i:i + chunk_size]
+            vals = conn.mget(chunk_keys)
+            
+            for key, val_str in zip(chunk_keys, vals):
                 if val_str:
-                    val = json.loads(val_str)
-                    lead_id = val.get("lead_id")
-                    payload = val.get("payload", {})
-                    email = payload.get("email")
-                    phone = val.get("phone_digits") or payload.get("phone")
-                    
-                    if lead_id:
-                        if email:
-                            mapping[email.lower().strip()] = lead_id
-                        if phone:
-                            clean_phone = "".join(filter(str.isdigit, str(phone)))
-                            if len(clean_phone) >= 10:
-                                mapping[clean_phone[-11:]] = lead_id
-            except Exception as e:
-                pass
+                    try:
+                        val = json.loads(val_str)
+                        lead_id = val.get("lead_id")
+                        payload = val.get("payload", {})
+                        email = payload.get("email")
+                        phone = val.get("phone_digits") or payload.get("phone")
+                        
+                        if lead_id:
+                            if email:
+                                mapping[email.lower().strip()] = lead_id
+                            if phone:
+                                clean_phone = "".join(filter(str.isdigit, str(phone)))
+                                if len(clean_phone) >= 10:
+                                    mapping[clean_phone[-11:]] = lead_id
+                    except:
+                        pass
         print(f"Loaded {len(mapping)} mappings from Redis.")
     except Exception as e:
         print("Error fetching from Redis:", e)
     return mapping
 
+GLOBAL_FORM_LEADS_CACHE = {}
 def fetch_meta_form_leads(form_id):
-    leads_mapping = {}  # lead_id -> campaign_id
+    global GLOBAL_FORM_LEADS_CACHE
+    new_mappings = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id&limit=1000&access_token={META_ACCESS_TOKEN}"
-        while url:
+        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id&limit=150&access_token={META_ACCESS_TOKEN}"
+        pages_fetched = 0
+        while url and pages_fetched < 10:  # limit to max 1500 leads to prevent long hangs
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=15.0) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
-                for lead in res.get("data", []):
+                data = res.get("data", [])
+                if not data:
+                    break
+                    
+                has_overlap = False
+                for lead in data:
                     l_id = lead.get("id")
                     c_id = lead.get("campaign_id")
                     if l_id and c_id:
-                        leads_mapping[l_id] = c_id
+                        new_mappings[l_id] = c_id
+                        if l_id in GLOBAL_FORM_LEADS_CACHE:
+                            has_overlap = True
+                            
+                if has_overlap:
+                    break
+                    
                 paging = res.get("paging", {})
                 url = paging.get("next")
-        print(f"Fetched {len(leads_mapping)} leads from Meta Form {form_id}.")
+                pages_fetched += 1
+                
+        GLOBAL_FORM_LEADS_CACHE.update(new_mappings)
+        print(f"Form leads cache size: {len(GLOBAL_FORM_LEADS_CACHE)} (added {len(new_mappings)} in this sync).")
     except Exception as e:
         print(f"Error fetching leads for form {form_id}:", e)
-    return leads_mapping
+    return GLOBAL_FORM_LEADS_CACHE
 
 META_LEAD_CAMPAIGN_CACHE = {}  # lead_id -> campaign_id
 
