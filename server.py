@@ -112,19 +112,6 @@ META_LEAD_CAMPAIGN_CACHE = {}  # lead_id -> campaign_id
 def get_campaign_for_lead(lead_id, form_leads_mapping):
     if lead_id in form_leads_mapping:
         return form_leads_mapping[lead_id]
-    if lead_id in META_LEAD_CAMPAIGN_CACHE:
-        return META_LEAD_CAMPAIGN_CACHE[lead_id]
-    try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{lead_id}?fields=campaign_id&access_token={META_ACCESS_TOKEN}"
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            c_id = res.get("campaign_id")
-            if c_id:
-                META_LEAD_CAMPAIGN_CACHE[lead_id] = c_id
-                return c_id
-    except Exception as e:
-        pass
     return None
 
 # Cache for custom Meta API queries (to avoid hitting Meta API repeatedly for the same dates)
