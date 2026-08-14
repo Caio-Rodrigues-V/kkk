@@ -100,7 +100,7 @@ def fetch_meta_form_leads(form_id):
     global GLOBAL_FORM_LEADS_CACHE
     new_mappings = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id&limit=150&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id&limit=150&access_token={META_ACCESS_TOKEN}"
         pages_fetched = 0
         while url and pages_fetched < 10:  # limit to max 1500 leads to prevent long hangs
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -114,8 +114,14 @@ def fetch_meta_form_leads(form_id):
                 for lead in data:
                     l_id = lead.get("id")
                     c_id = lead.get("campaign_id")
-                    if l_id and c_id:
-                        new_mappings[l_id] = c_id
+                    a_id = lead.get("adset_id")
+                    ad_id = lead.get("ad_id")
+                    if l_id:
+                        new_mappings[l_id] = {
+                            "campaign_id": c_id,
+                            "adset_id": a_id,
+                            "ad_id": ad_id
+                        }
                         if l_id in GLOBAL_FORM_LEADS_CACHE:
                             has_overlap = True
                             
@@ -132,15 +138,17 @@ def fetch_meta_form_leads(form_id):
         print(f"Error fetching leads for form {form_id}:", e)
     return GLOBAL_FORM_LEADS_CACHE
 
-META_LEAD_CAMPAIGN_CACHE = {}  # lead_id -> campaign_id
-
 def get_campaign_for_lead(lead_id, form_leads_mapping):
     if lead_id in form_leads_mapping:
-        return form_leads_mapping[lead_id]
+        val = form_leads_mapping[lead_id]
+        if isinstance(val, dict):
+            return val.get("campaign_id")
+        return val
     return None
 
 # Cache for custom Meta API queries (to avoid hitting Meta API repeatedly for the same dates)
 CUSTOM_META_CACHE = {}  # Key: "start_date:end_date", Value: (timestamp, campaigns_list)
+CUSTOM_META_DAILY_SPEND_CACHE = {}  # Key: "start_date:end_date", Value: (timestamp, daily_spend_list)
 CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
 
 def fetch_meta_campaigns_metadata():
@@ -447,6 +455,51 @@ def get_custom_meta_ads(start_date, end_date):
     except Exception as e:
         print(f"Error fetching Meta Ads ads for custom range {start_date} to {end_date}:", e)
 
+def fetch_meta_daily_spend(preset):
+    daily_spend = []
+    try:
+        url_ds = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=account&fields=date_start,spend&time_increment=1&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
+        req_ds = urllib.request.Request(url_ds, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_ds, timeout=15.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            for item in res.get("data", []):
+                daily_spend.append({
+                    "date": item.get("date_start"),
+                    "spend": float(item.get("spend", 0.0))
+                })
+        print(f"Fetched {len(daily_spend)} daily spend records for preset '{preset}'.")
+    except Exception as e:
+        print(f"Error fetching daily spend for preset '{preset}':", e)
+    return daily_spend
+
+def get_custom_meta_daily_spend(start_date, end_date):
+    key = f"{start_date}:{end_date}"
+    now = datetime.now()
+    if key in CUSTOM_META_DAILY_SPEND_CACHE:
+        cache_time, data = CUSTOM_META_DAILY_SPEND_CACHE[key]
+        if now - cache_time < CUSTOM_META_CACHE_EXPIRY:
+            print(f"Returning cached custom Meta daily spend for {key}.")
+            return data
+
+    daily_spend = []
+    try:
+        time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
+        url_ds = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=account&fields=date_start,spend&time_increment=1&time_range={time_range}&limit=500&access_token={META_ACCESS_TOKEN}"
+        req_ds = urllib.request.Request(url_ds, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req_ds, timeout=15.0) as resp:
+            res = json.loads(resp.read().decode("utf-8"))
+            for item in res.get("data", []):
+                daily_spend.append({
+                    "date": item.get("date_start"),
+                    "spend": float(item.get("spend", 0.0))
+                })
+        print(f"Fetched {len(daily_spend)} daily spend records for custom range {start_date} to {end_date}.")
+        CUSTOM_META_DAILY_SPEND_CACHE[key] = (now, daily_spend)
+    except Exception as e:
+        print(f"Error fetching custom daily spend for {start_date} to {end_date}:", e)
+    return daily_spend
+
+
 def fetch_raw_live_data():
     print(f"[{datetime.now().isoformat()}] Fetching live data from Dinx and Meta APIs...")
     
@@ -474,6 +527,7 @@ def fetch_raw_live_data():
     meta_campaigns_by_preset = {}
     meta_adsets_by_preset = {}
     meta_ads_by_preset = {}
+    meta_daily_spend_by_preset = {}
     
     # Fetch metadata once
     campaigns_meta = fetch_meta_campaigns_metadata()
@@ -491,6 +545,7 @@ def fetch_raw_live_data():
         meta_campaigns_by_preset[range_key] = fetch_meta_campaigns(preset, campaigns_meta)
         meta_adsets_by_preset[range_key] = fetch_meta_adsets(preset, adsets_meta)
         meta_ads_by_preset[range_key] = fetch_meta_ads(preset, ads_meta)
+        meta_daily_spend_by_preset[range_key] = fetch_meta_daily_spend(preset)
 
     # 3. Fetch Instagram profile & media
     ig_profile = {}
@@ -522,11 +577,13 @@ def fetch_raw_live_data():
         "meta_campaigns": meta_campaigns_by_preset,
         "meta_adsets": meta_adsets_by_preset,
         "meta_ads": meta_ads_by_preset,
+        "meta_daily_spend": meta_daily_spend_by_preset,
         "ig_profile": ig_profile,
         "ig_media": ig_media,
         "redis_mapping": redis_mapping,
         "form_leads_mapping": form_leads_mapping
     }
+
 
 def save_raw_cache(raw_data):
     try:
@@ -678,6 +735,7 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     meta_campaigns_raw_all = raw_data.get("meta_campaigns", {})
     meta_adsets_raw_all = raw_data.get("meta_adsets", {})
     meta_ads_raw_all = raw_data.get("meta_ads", {})
+    meta_daily_spend_raw_all = raw_data.get("meta_daily_spend", {})
     ig_profile = raw_data.get("ig_profile", {})
     ig_media = raw_data.get("ig_media", [])
 
@@ -689,6 +747,21 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
 
     # Calculate date range boundaries for Dinx leads
     start_bound, end_bound = get_date_range_bounds(date_range, start_date, end_date)
+
+    # Load Meta Daily Spend
+    meta_daily_spend_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_daily_spend_raw = get_custom_meta_daily_spend(start_date, end_date)
+    elif isinstance(meta_daily_spend_raw_all, dict):
+        meta_daily_spend_raw = meta_daily_spend_raw_all.get(date_range, [])
+    else:
+        meta_daily_spend_raw = []
+        
+    daily_spend_map = {}
+    for item in meta_daily_spend_raw:
+        d_str = item.get("date")
+        if d_str:
+            daily_spend_map[d_str] = item.get("spend", 0.0)
 
     # 4. Aggregations & Calculations (Filtered by Date Range)
     dinx_totals = 0
@@ -756,16 +829,24 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                     daily_registrations[act_day_str] = {"cadastros": 0, "qualificados": 0, "ativados": 0, "ativados_cohort": 0}
                 daily_registrations[act_day_str]["ativados"] += 1
                 
-    # Sort and filter daily registrations by date
+    # Sort and filter daily registrations and spends by date
     sorted_daily = []
-    for day in sorted(daily_registrations.keys()):
+    all_days = set(daily_registrations.keys()).union(set(daily_spend_map.keys()))
+    for day in sorted(all_days):
         if date_str_in_range(day, start_bound, end_bound):
+            day_spend = daily_spend_map.get(day, 0.0)
+            reg_info = daily_registrations.get(day, {"cadastros": 0, "qualificados": 0, "ativados": 0, "ativados_cohort": 0})
+            day_qualificados = reg_info.get("qualificados", 0)
+            day_cpl = (day_spend / day_qualificados) if day_qualificados > 0 else 0.0
+            
             sorted_daily.append({
                 "date": day,
-                "cadastros": daily_registrations[day].get("cadastros", 0),
-                "qualificados": daily_registrations[day].get("qualificados", 0),
-                "ativados": daily_registrations[day].get("ativados", 0),
-                "ativados_cohort": daily_registrations[day].get("ativados_cohort", 0)
+                "cadastros": reg_info.get("cadastros", 0),
+                "qualificados": day_qualificados,
+                "ativados": reg_info.get("ativados", 0),
+                "ativados_cohort": reg_info.get("ativados_cohort", 0),
+                "spend": day_spend,
+                "cpl": day_cpl
             })
         
     # 5. Campaign Attribution Logic (Dinx Backoffice to Meta Campaigns)
@@ -778,7 +859,9 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     form_leads_mapping = raw_data.get("form_leads_mapping", {})
     
     # Direct UTM campaign mapping: campaign_id -> { "leads": 0, "approved": 0, "activated": 0 }
-    direct_attributions = {}
+    direct_campaigns = {}
+    direct_adsets = {}
+    direct_ads = {}
     
     # For attribution, we filter leads by range to match campaign dates
     for r in dinx_requests:
@@ -814,17 +897,45 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                 lead_id = redis_mapping.get(clean_phone[-11:])
                 
         if lead_id:
-            camp_id = get_campaign_for_lead(lead_id, form_leads_mapping)
-            if camp_id:
-                if camp_id not in direct_attributions:
-                    direct_attributions[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
+            lead_meta = form_leads_mapping.get(lead_id)
+            c_id, a_id, ad_id = None, None, None
+            if isinstance(lead_meta, dict):
+                c_id = lead_meta.get("campaign_id")
+                a_id = lead_meta.get("adset_id")
+                ad_id = lead_meta.get("ad_id")
+            elif isinstance(lead_meta, str):
+                c_id = lead_meta
+                
+            if c_id:
+                if c_id not in direct_campaigns:
+                    direct_campaigns[c_id] = {"leads": 0, "approved": 0, "activated": 0}
                 if in_creation_range:
-                    direct_attributions[camp_id]["leads"] += 1
+                    direct_campaigns[c_id]["leads"] += 1
                     if is_qualificado:
-                        direct_attributions[camp_id]["approved"] += 1
+                        direct_campaigns[c_id]["approved"] += 1
                 if is_ativado and in_activation_range:
-                    direct_attributions[camp_id]["activated"] += 1
+                    direct_campaigns[c_id]["activated"] += 1
                 attributed = True
+                
+            if a_id:
+                if a_id not in direct_adsets:
+                    direct_adsets[a_id] = {"leads": 0, "approved": 0, "activated": 0}
+                if in_creation_range:
+                    direct_adsets[a_id]["leads"] += 1
+                    if is_qualificado:
+                        direct_adsets[a_id]["approved"] += 1
+                if is_ativado and in_activation_range:
+                    direct_adsets[a_id]["activated"] += 1
+                    
+            if ad_id:
+                if ad_id not in direct_ads:
+                    direct_ads[ad_id] = {"leads": 0, "approved": 0, "activated": 0}
+                if in_creation_range:
+                    direct_ads[ad_id]["leads"] += 1
+                    if is_qualificado:
+                        direct_ads[ad_id]["approved"] += 1
+                if is_ativado and in_activation_range:
+                    direct_ads[ad_id]["activated"] += 1
                 
         # 2. Fallback to direct UTM campaign mapping
         if not attributed:
@@ -836,13 +947,13 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                     if "utm_campaign" in qs:
                         camp_id = qs["utm_campaign"][0]
                         if camp_id:
-                            if camp_id not in direct_attributions:
-                                direct_attributions[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
-                            direct_attributions[camp_id]["leads"] += 1
+                            if camp_id not in direct_campaigns:
+                                direct_campaigns[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
+                            direct_campaigns[camp_id]["leads"] += 1
                             if is_qualificado:
-                                direct_attributions[camp_id]["approved"] += 1
+                                direct_campaigns[camp_id]["approved"] += 1
                             if is_ativado and in_activation_range:
-                                direct_attributions[camp_id]["activated"] += 1
+                                direct_campaigns[camp_id]["activated"] += 1
                             attributed = True
                 except:
                     pass
@@ -864,8 +975,7 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # Enrich campaign list with attributed backoffice data (strictly direct)
     for c in meta_campaigns:
         c_id = c["id"]
-        direct = direct_attributions.get(c_id, {"leads": 0, "approved": 0, "activated": 0})
-        
+        direct = direct_campaigns.get(c_id, {"leads": 0, "approved": 0, "activated": 0})
         c["dinx_leads"] = direct["leads"]
         c["dinx_approved"] = direct["approved"]
         c["dinx_activated"] = direct["activated"]
@@ -883,6 +993,13 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     for a in meta_adsets_raw:
         meta_adsets.append(dict(a))
         
+    for a in meta_adsets:
+        a_id = a["id"]
+        direct = direct_adsets.get(a_id, {"leads": 0, "approved": 0, "activated": 0})
+        a["dinx_leads"] = direct["leads"]
+        a["dinx_approved"] = direct["approved"]
+        a["dinx_activated"] = direct["activated"]
+        
     # Load Meta Ads for the requested date_range
     meta_ads_raw = []
     if date_range == "custom" and start_date and end_date:
@@ -895,6 +1012,13 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     meta_ads = []
     for ad in meta_ads_raw:
         meta_ads.append(dict(ad))
+        
+    for ad in meta_ads:
+        ad_id = ad["id"]
+        direct = direct_ads.get(ad_id, {"leads": 0, "approved": 0, "activated": 0})
+        ad["dinx_leads"] = direct["leads"]
+        ad["dinx_approved"] = direct["approved"]
+        ad["dinx_activated"] = direct["activated"]
 
     # Meta Spends split
     total_spend = sum(c["spend"] for c in meta_campaigns)
