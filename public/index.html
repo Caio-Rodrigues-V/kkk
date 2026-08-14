@@ -421,9 +421,27 @@
 
         <!-- 3. META CAMPAIGNS PAGE -->
         <div id="page-campaigns" class="tab-page hidden space-y-8">
-          <div>
-            <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Campanhas Meta Ads</h1>
-            <p class="text-xs text-slate-500 mt-1">Desempenho de investimento cruzado com os dados de cadastros atribuídos no backoffice da Dinx.</p>
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Campanhas Meta Ads</h1>
+              <p class="text-xs text-slate-500 mt-1">Desempenho de investimento cruzado com os dados de cadastros atribuídos no backoffice da Dinx.</p>
+            </div>
+            
+            <!-- Sub-navigation Tabs -->
+            <div class="flex border-b border-slate-200 self-start md:self-auto" id="sub-tab-bar">
+              <button class="sub-tab-btn border-b-2 border-purple-600 px-4 py-2.5 text-xs font-bold text-purple-600 focus:outline-none transition-all duration-150 flex items-center gap-2 active" data-subtab="campaigns">
+                Campanhas
+                <span id="badge-count-campaigns" class="bg-purple-100 text-purple-700 text-[9px] font-extrabold px-2 py-0.5 rounded-full ml-1">0</span>
+              </button>
+              <button class="sub-tab-btn border-b-2 border-transparent hover:border-slate-300 hover:text-slate-600 px-4 py-2.5 text-xs font-bold text-slate-500 focus:outline-none transition-all duration-150 flex items-center gap-2" data-subtab="adsets">
+                Conjuntos
+                <span id="badge-count-adsets" class="bg-slate-100 text-slate-600 text-[9px] font-extrabold px-2 py-0.5 rounded-full ml-1">0</span>
+              </button>
+              <button class="sub-tab-btn border-b-2 border-transparent hover:border-slate-300 hover:text-slate-600 px-4 py-2.5 text-xs font-bold text-slate-500 focus:outline-none transition-all duration-150 flex items-center gap-2" data-subtab="ads">
+                Anúncios
+                <span id="badge-count-ads" class="bg-slate-100 text-slate-600 text-[9px] font-extrabold px-2 py-0.5 rounded-full ml-1">0</span>
+              </button>
+            </div>
           </div>
 
           <!-- Table Controls Filter Card -->
@@ -447,7 +465,7 @@
           <div class="bg-white border border-slate-100 rounded-2xl shadow-sm overflow-hidden">
             <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse text-xs md:text-sm" id="campaigns-table">
-                <thead>
+                <thead id="campaigns-table-header">
                   <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
                     <th class="px-6 py-4">Campanha</th>
                     <th class="px-6 py-4">Status</th>

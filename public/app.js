@@ -1,6 +1,7 @@
 // State Variables
 let dashboardData = null;
 let activeTab = 'overview';
+let activeSubTab = 'campaigns';
 let excludeInternal = localStorage.getItem("exclude_internal") === "true";
 let dateRange = localStorage.getItem("date_range") || "all";
 let customStartDate = localStorage.getItem("custom_start_date") || "";
@@ -212,6 +213,34 @@ document.addEventListener("DOMContentLoaded", () => {
   // Mobile drawer events
   btnToggleSidebarEl.addEventListener("click", openMobileSidebar);
   backdropEl.addEventListener("click", closeMobileSidebar);
+
+  // Sub-tab Navigation
+  const subTabBtns = document.querySelectorAll(".sub-tab-btn");
+  subTabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      subTabBtns.forEach(b => {
+        b.classList.remove("active", "border-purple-600", "text-purple-600");
+        b.classList.add("border-transparent", "text-slate-500");
+      });
+      btn.classList.add("active", "border-purple-600", "text-purple-600");
+      btn.classList.remove("border-transparent", "text-slate-500");
+      
+      activeSubTab = btn.getAttribute("data-subtab");
+      campaignCurrentPage = 1;
+      
+      // Update placeholder search text
+      const searchInput = document.getElementById("campaign-search");
+      if (activeSubTab === "campaigns") {
+        searchInput.placeholder = "Buscar campanhas por nome...";
+      } else if (activeSubTab === "adsets") {
+        searchInput.placeholder = "Buscar conjuntos de anúncios...";
+      } else {
+        searchInput.placeholder = "Buscar anúncios por nome...";
+      }
+      
+      renderCampaignsTable();
+    });
+  });
 
   // Set initial active tab state
   switchTab('overview');
@@ -632,31 +661,93 @@ function renderBreakdownTab() {
   originChart.render();
 }
 
-// 4. Render Meta Campaigns Table
+// 4. Render Meta Campaigns, Adsets, or Ads Table
 function renderCampaignsTable() {
-  const campaigns = dashboardData.meta_stats.campaigns;
+  if (!dashboardData) return;
 
-  // Filter campaigns
-  let filtered = campaigns.filter(c => {
-    const matchSearch = c.name.toLowerCase().includes(campaignSearchQuery.toLowerCase());
+  const ms = dashboardData.meta_stats;
+  const campaigns = ms.campaigns || [];
+  const adsets = ms.adsets || [];
+  const ads = ms.ads || [];
+
+  // 1. Update sub-tab badge counts
+  const badgeCampaigns = document.getElementById("badge-count-campaigns");
+  const badgeAdsets = document.getElementById("badge-count-adsets");
+  const badgeAds = document.getElementById("badge-count-ads");
+  
+  if (badgeCampaigns) badgeCampaigns.textContent = campaigns.length;
+  if (badgeAdsets) badgeAdsets.textContent = adsets.length;
+  if (badgeAds) badgeAds.textContent = ads.length;
+
+  // 2. Select dataset and dynamically set table header
+  let dataList = [];
+  const header = document.getElementById("campaigns-table-header");
+
+  if (!header) return;
+
+  if (activeSubTab === "campaigns") {
+    dataList = campaigns;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Campanha</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Investimento</th>
+        <th class="px-6 py-4 text-right">Leads (Meta)</th>
+        <th class="px-6 py-4 text-right">Leads (Dinx)</th>
+        <th class="px-6 py-4 text-right text-orange-600">Qualificados</th>
+        <th class="px-6 py-4 text-right">CPL (Meta)</th>
+        <th class="px-6 py-4 text-right text-orange-600">CPA (Dinx)</th>
+      </tr>
+    `;
+  } else if (activeSubTab === "adsets") {
+    dataList = adsets;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Conjunto de Anúncios</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Investimento</th>
+        <th class="px-6 py-4 text-right">Leads (Meta)</th>
+        <th class="px-6 py-4 text-right">CPL (Meta)</th>
+      </tr>
+    `;
+  } else {
+    dataList = ads;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Anúncio</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Investimento</th>
+        <th class="px-6 py-4 text-right">Leads (Meta)</th>
+        <th class="px-6 py-4 text-right">CPL (Meta)</th>
+      </tr>
+    `;
+  }
+
+  // 3. Filter list
+  let filtered = dataList.filter(item => {
+    const nameStr = item.name || "";
+    const matchSearch = nameStr.toLowerCase().includes(campaignSearchQuery.toLowerCase());
     
     let matchStatus = true;
     if (campaignStatusFilter === "ACTIVE") {
-      matchStatus = c.status === "ACTIVE";
+      matchStatus = (item.status || "").toUpperCase() === "ACTIVE";
     } else if (campaignStatusFilter === "PAUSED") {
-      matchStatus = c.status === "PAUSED";
+      matchStatus = (item.status || "").toUpperCase() === "PAUSED";
     }
     
     return matchSearch && matchStatus;
   });
 
+  // Sort by spend descending
   filtered.sort((a, b) => b.spend - a.spend);
 
   const tbody = document.getElementById("campaigns-table-body");
   tbody.innerHTML = "";
 
+  const itemsName = activeSubTab === "campaigns" ? "campanhas" : (activeSubTab === "adsets" ? "conjuntos" : "anúncios");
+
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wide">Nenhuma campanha encontrada.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wide">Nenhum registro encontrado.</td></tr>`;
     document.getElementById("table-pagination").innerHTML = "";
     return;
   }
@@ -665,33 +756,69 @@ function renderCampaignsTable() {
   const paginated = filtered.slice(startIndex, startIndex + campaignItemsPerPage);
   const totalPages = Math.ceil(filtered.length / campaignItemsPerPage);
 
-  paginated.forEach(c => {
+  // 4. Render rows
+  paginated.forEach(item => {
     const tr = document.createElement("tr");
-    tr.className = "hover:bg-slate-50/50 transition-colors";
+    tr.className = "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0";
     
-    const isActive = c.status.toLowerCase() === 'active';
+    const isActive = (item.status || "").toLowerCase() === 'active';
     const statusClass = isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200';
     const statusText = isActive ? 'Ativo' : 'Pausado';
-    const cpl = c.leads > 0 ? (c.spend / c.leads) : 0;
-    const cpa = c.dinx_approved > 0 ? (c.spend / c.dinx_approved) : 0;
+    const cpl = item.leads > 0 ? (item.spend / item.leads) : 0;
 
-    tr.innerHTML = `
-      <td class="px-6 py-4 font-bold text-slate-800 max-w-[280px] overflow-hidden text-overflow-ellipsis whitespace-nowrap" title="${c.name}">${c.name}</td>
-      <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
-      <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(c.spend)}</td>
-      <td class="px-6 py-4 text-right">${formatInteger(c.leads)}</td>
-      <td class="px-6 py-4 text-right font-semibold">${formatInteger(c.dinx_leads)}</td>
-      <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(c.dinx_approved)}</td>
-      <td class="px-6 py-4 text-right text-slate-400 font-semibold">${c.leads > 0 ? formatCurrency(cpl) : '—'}</td>
-      <td class="px-6 py-4 text-right font-extrabold text-orange-600">${c.dinx_approved > 0 ? formatCurrency(cpa) : '—'}</td>
-    `;
+    if (activeSubTab === "campaigns") {
+      const cpa = item.dinx_approved > 0 ? (item.spend / item.dinx_approved) : 0;
+      tr.innerHTML = `
+        <td class="px-6 py-4 font-bold text-slate-800 break-words whitespace-normal min-w-[240px] max-w-[340px]" title="${item.name}">${item.name}</td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(item.spend)}</td>
+        <td class="px-6 py-4 text-right">${formatInteger(item.leads)}</td>
+        <td class="px-6 py-4 text-right font-semibold">${formatInteger(item.dinx_leads || 0)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(item.dinx_approved || 0)}</td>
+        <td class="px-6 py-4 text-right text-slate-400 font-semibold">${item.leads > 0 ? formatCurrency(cpl) : '—'}</td>
+        <td class="px-6 py-4 text-right font-extrabold text-orange-600">${item.dinx_approved > 0 ? formatCurrency(cpa) : '—'}</td>
+      `;
+    } else if (activeSubTab === "adsets") {
+      tr.innerHTML = `
+        <td class="px-6 py-4 font-bold text-slate-800 break-words whitespace-normal min-w-[240px] max-w-[340px]" title="${item.name}">${item.name}</td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(item.spend)}</td>
+        <td class="px-6 py-4 text-right">${formatInteger(item.leads)}</td>
+        <td class="px-6 py-4 text-right text-slate-400 font-semibold">${item.leads > 0 ? formatCurrency(cpl) : '—'}</td>
+      `;
+    } else {
+      // For Ads: display ad image next to name
+      const imgTag = item.thumbnail_url 
+        ? `<img src="${item.thumbnail_url}" class="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0 shadow-sm border border-slate-100">`
+        : `<div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-500 border border-purple-100/50 flex items-center justify-center flex-shrink-0 shadow-sm"><i data-lucide="image" class="w-4 h-4"></i></div>`;
+      
+      tr.innerHTML = `
+        <td class="px-6 py-4 flex items-center gap-3 min-w-[240px] max-w-[360px]">
+          ${imgTag}
+          <div class="flex flex-col leading-tight break-words whitespace-normal w-full">
+            <span class="font-bold text-slate-800" title="${item.name}">${item.name}</span>
+            <span class="text-[9px] text-slate-400 font-semibold mt-0.5">ID: ${item.id}</span>
+          </div>
+        </td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(item.spend)}</td>
+        <td class="px-6 py-4 text-right">${formatInteger(item.leads)}</td>
+        <td class="px-6 py-4 text-right text-slate-400 font-semibold">${item.leads > 0 ? formatCurrency(cpl) : '—'}</td>
+      `;
+    }
+    
     tbody.appendChild(tr);
   });
+
+  // Re-run lucide icons to build the fallback image icon if needed
+  if (activeSubTab === "ads") {
+    lucide.createIcons();
+  }
 
   // Render pagination controls
   const paginationContainer = document.getElementById("table-pagination");
   paginationContainer.innerHTML = `
-    <div>Mostrando ${startIndex + 1} a ${Math.min(startIndex + campaignItemsPerPage, filtered.length)} de ${filtered.length} campanhas</div>
+    <div>Mostrando ${startIndex + 1} a ${Math.min(startIndex + campaignItemsPerPage, filtered.length)} de ${filtered.length} ${itemsName}</div>
     <div class="flex gap-2">
       <button class="bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" id="btn-page-prev" ${campaignCurrentPage === 1 ? 'disabled' : ''}>Anterior</button>
       <button class="bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" id="btn-page-next" ${campaignCurrentPage === totalPages ? 'disabled' : ''}>Próxima</button>
