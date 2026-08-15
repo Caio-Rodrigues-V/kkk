@@ -403,6 +403,45 @@ function renderOverviewTab() {
   document.getElementById("sub-cpl-qualif").textContent = formatCurrency(cplQualif);
   document.getElementById("sub-cpl-qualif-det").textContent = `${formatCurrency(ms.lead_campaign_spend)} / ${formatInteger(ds.qualificados_private)}`;
 
+  const taxaAtivacao = ds.qualificados_private > 0 ? (ds.ativados / ds.qualificados_private) : 0;
+  const subTaxaAtivEl = document.getElementById("sub-taxa-ativacao");
+  if (subTaxaAtivEl) {
+    subTaxaAtivEl.textContent = formatPercentage(taxaAtivacao);
+    document.getElementById("sub-taxa-ativacao-det").textContent = `${formatInteger(ds.ativados)} / ${formatInteger(ds.qualificados_private)}`;
+  }
+
+  // Top Highlights
+  if (ms.campaigns && ms.campaigns.length > 0) {
+    let topC = ms.campaigns[0];
+    for (let c of ms.campaigns) {
+      if ((c.dinx_approved || 0) > (topC.dinx_approved || 0)) topC = c;
+    }
+    const topCampEl = document.getElementById("top-campaign-name");
+    if (topCampEl) {
+      topCampEl.textContent = topC.name || "Desconhecida";
+      document.getElementById("top-campaign-leads").textContent = formatInteger(topC.dinx_approved || 0);
+    }
+  }
+  
+  if (ms.ads && ms.ads.length > 0) {
+    let topA = ms.ads[0];
+    for (let a of ms.ads) {
+      if ((a.dinx_approved || 0) > (topA.dinx_approved || 0)) topA = a;
+    }
+    const topCreEl = document.getElementById("top-creative-name");
+    if (topCreEl) {
+      topCreEl.textContent = topA.name || "Desconhecido";
+      document.getElementById("top-creative-leads").textContent = formatInteger(topA.dinx_approved || 0);
+      const imgEl = document.getElementById("top-creative-img");
+      if (topA.thumbnail_url) {
+        imgEl.src = topA.thumbnail_url;
+        imgEl.classList.remove("hidden");
+      } else {
+        imgEl.classList.add("hidden");
+      }
+    }
+  }
+
   // Circular progress & CPA panel
   const cpaVal = ds.qualificados > 0 ? (ms.lead_campaign_spend / ds.qualificados) : 0;
   document.getElementById("cpa-value-text").textContent = formatCurrency(cpaVal);

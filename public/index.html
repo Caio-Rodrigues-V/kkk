@@ -282,13 +282,13 @@
             </div>
 
             <!-- Sub KPIs Row -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div class="bg-slate-50/40 border border-slate-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div class="flex items-center gap-3">
                   <div class="text-orange-500">
                     <i data-lucide="percent" class="w-4.5 h-4.5"></i>
                   </div>
-                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">TAXA DE QUALIFICAÇÃO (PARTICULAR)</span>
+                  <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">TAXA DE QUALIFICAÇÃO</span>
                 </div>
                 <div class="flex flex-col items-end">
                   <span class="text-base font-extrabold text-slate-800" id="sub-taxa-qualif">0,00%</span>
@@ -298,15 +298,61 @@
               
               <div class="bg-slate-50/40 border border-slate-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div class="flex items-center gap-3">
+                  <div class="text-emerald-500">
+                    <i data-lucide="activity" class="w-4.5 h-4.5"></i>
+                  </div>
+                  <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">TAXA DE ATIVAÇÃO</span>
+                </div>
+                <div class="flex flex-col items-end">
+                  <span class="text-base font-extrabold text-slate-800" id="sub-taxa-ativacao">0,00%</span>
+                  <span class="text-[10px] text-slate-400 font-semibold mt-0.5" id="sub-taxa-ativacao-det">0 / 0</span>
+                </div>
+              </div>
+
+              <div class="bg-slate-50/40 border border-slate-100 rounded-xl px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div class="flex items-center gap-3">
                   <div class="text-purple-600">
                     <i data-lucide="dollar-sign" class="w-4.5 h-4.5"></i>
                   </div>
-                  <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">CUSTO POR LEAD QUALIFICADO (PART.)</span>
+                  <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wide">CPL QUALIFICADO</span>
                 </div>
                 <div class="flex flex-col items-end">
                   <span class="text-base font-extrabold text-slate-800" id="sub-cpl-qualif">R$ 0,00</span>
                   <span class="text-[10px] text-slate-400 font-semibold mt-0.5" id="sub-cpl-qualif-det">R$ 0,00 / 0</span>
                 </div>
+              </div>
+            </div>
+            </div>
+          </div>
+
+          <!-- Top Highlights Row -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+              <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                <i data-lucide="award" class="w-6 h-6"></i>
+              </div>
+              <div class="flex-grow min-w-0">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Campanha Destaque</span>
+                <h3 class="text-sm font-extrabold text-slate-800 truncate" id="top-campaign-name">-</h3>
+              </div>
+              <div class="flex flex-col items-end">
+                <span class="text-lg font-extrabold text-indigo-600" id="top-campaign-leads">0</span>
+                <span class="text-[10px] text-slate-400 font-semibold">qualificados</span>
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+              <div class="p-3 bg-rose-50 text-rose-600 rounded-xl overflow-hidden relative shrink-0">
+                <i data-lucide="image" class="w-6 h-6 z-10 relative"></i>
+                <img id="top-creative-img" src="" class="absolute inset-0 w-full h-full object-cover hidden" alt="Criativo">
+              </div>
+              <div class="flex-grow min-w-0">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Criativo Destaque</span>
+                <h3 class="text-sm font-extrabold text-slate-800 truncate" id="top-creative-name">-</h3>
+              </div>
+              <div class="flex flex-col items-end">
+                <span class="text-lg font-extrabold text-rose-600" id="top-creative-leads">0</span>
+                <span class="text-[10px] text-slate-400 font-semibold">qualificados</span>
               </div>
             </div>
           </div>

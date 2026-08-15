@@ -1023,12 +1023,13 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     # Meta Spends split
     total_spend = sum(c["spend"] for c in meta_campaigns)
     
-    # Classify campaigns: Lead Campaigns (leads > 0 or has "FORMS" in name)
+    # Classify campaigns: Lead Campaigns
     lead_campaign_spend = 0.0
     profile_visit_spend = 0.0
     
     for c in meta_campaigns:
-        is_lead_camp = c["leads"] > 0 or "FORMS" in c["name"].upper() or "LEADS" in c["name"].upper()
+        obj = c.get("objective", "").upper()
+        is_lead_camp = (obj in ["OUTCOME_LEADS", "LEAD_GENERATION"]) or (c.get("leads", 0) > 0) or ("FORMS" in c["name"].upper()) or ("LEADS" in c["name"].upper())
         if is_lead_camp:
             lead_campaign_spend += c["spend"]
         else:
