@@ -1193,6 +1193,201 @@ function renderInstagramTab() {
   document.getElementById("ig-followers").textContent = formatInteger(profile.followers_count || 0);
   document.getElementById("ig-media-count").textContent = formatInteger(profile.media_count || 0);
   
+    document.getElementById("highlight-ad-name").textContent = "Nenhum criativo atribuído";
+    document.getElementById("highlight-ad-value").textContent = "0 qualif.";
+    document.getElementById("highlight-ad-sub").textContent = "R$ 0,00 investido";
+    adImgContainer.innerHTML = `<i data-lucide="image" class="w-5 h-5 text-slate-400"></i>`;
+  }
+
+  // 1. Update sub-tab badge counts
+  const badgeCampaigns = document.getElementById("badge-count-campaigns");
+  const badgeAdsets = document.getElementById("badge-count-adsets");
+  const badgeAds = document.getElementById("badge-count-ads");
+  
+  if (badgeCampaigns) badgeCampaigns.textContent = campaigns.length;
+  if (badgeAdsets) badgeAdsets.textContent = adsets.length;
+  if (badgeAds) badgeAds.textContent = ads.length;
+
+  // 2. Select dataset and dynamically set table header
+  let dataList = [];
+  const header = document.getElementById("campaigns-table-header");
+
+  if (!header) return;
+
+  if (activeSubTab === "campaigns") {
+    dataList = campaigns;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Nome da campanha</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Valor investido</th>
+        <th class="px-6 py-4 text-right">Cadastros totais</th>
+        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+      </tr>
+    `;
+  } else if (activeSubTab === "adsets") {
+    dataList = adsets;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Nome do conjunto</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Valor investido</th>
+        <th class="px-6 py-4 text-right">Cadastros totais</th>
+        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+      </tr>
+    `;
+  } else {
+    dataList = ads;
+    header.innerHTML = `
+      <tr class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+        <th class="px-6 py-4">Nome do anúncio</th>
+        <th class="px-6 py-4">Status</th>
+        <th class="px-6 py-4 text-right">Valor investido</th>
+        <th class="px-6 py-4 text-right">Cadastros totais</th>
+        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+      </tr>
+    `;
+  }
+
+  // 3. Filter list
+  let filtered = dataList.filter(item => {
+    const nameStr = item.name || "";
+    const matchSearch = nameStr.toLowerCase().includes(campaignSearchQuery.toLowerCase());
+    
+    let matchStatus = true;
+    if (campaignStatusFilter === "ACTIVE") {
+      matchStatus = (item.status || "").toUpperCase() === "ACTIVE";
+    } else if (campaignStatusFilter === "PAUSED") {
+      matchStatus = (item.status || "").toUpperCase() === "PAUSED";
+    }
+    
+    return matchSearch && matchStatus;
+  });
+
+  // Sort by spend descending
+  filtered.sort((a, b) => b.spend - a.spend);
+
+  const tbody = document.getElementById("campaigns-table-body");
+  tbody.innerHTML = "";
+
+  const itemsName = activeSubTab === "campaigns" ? "campanhas" : (activeSubTab === "adsets" ? "conjuntos" : "anúncios");
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wide">Nenhum registro encontrado.</td></tr>`;
+    document.getElementById("table-pagination").innerHTML = "";
+    return;
+  }
+
+  const startIndex = (campaignCurrentPage - 1) * campaignItemsPerPage;
+  const paginated = filtered.slice(startIndex, startIndex + campaignItemsPerPage);
+  const totalPages = Math.ceil(filtered.length / campaignItemsPerPage);
+
+  // 4. Render rows
+  paginated.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.className = "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0";
+    
+    const isActive = (item.status || "").toLowerCase() === 'active';
+    const statusClass = isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200';
+    const statusText = isActive ? 'Ativo' : 'Pausado';
+    
+    const spend = item.spend || 0.0;
+    const leads = item.leads || 0;
+    const qualificados = item.dinx_approved || 0;
+    const ativados = item.dinx_activated || 0;
+    
+    const cpl = leads > 0 ? (spend / leads) : 0;
+    const cpaQualif = qualificados > 0 ? (spend / qualificados) : 0;
+    const cpaActiv = ativados > 0 ? (spend / ativados) : 0;
+
+    if (activeSubTab === "campaigns") {
+      tr.innerHTML = `
+        <td class="px-6 py-4 font-bold text-slate-800 break-words whitespace-normal min-w-[240px] max-w-[340px]" title="${item.name}">${item.name}</td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
+        <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+      `;
+    } else if (activeSubTab === "adsets") {
+      tr.innerHTML = `
+        <td class="px-6 py-4 font-bold text-slate-800 break-words whitespace-normal min-w-[240px] max-w-[340px]" title="${item.name}">${item.name}</td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
+        <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+      `;
+    } else {
+      const imgTag = item.thumbnail_url 
+        ? `<img src="${item.thumbnail_url}" class="w-10 h-10 rounded-lg object-cover bg-slate-100 flex-shrink-0 shadow-sm border border-slate-100">`
+        : `<div class="w-10 h-10 rounded-lg bg-purple-50 text-purple-500 border border-purple-100/50 flex items-center justify-center flex-shrink-0 shadow-sm"><i data-lucide="image" class="w-4 h-4"></i></div>`;
+      
+      tr.innerHTML = `
+        <td class="px-6 py-4 flex items-center gap-3 min-w-[240px] max-w-[360px]">
+          ${imgTag}
+          <div class="flex flex-col leading-tight break-words whitespace-normal w-full">
+            <span class="font-bold text-slate-800" title="${item.name}">${item.name}</span>
+            <span class="text-[9px] text-slate-400 font-semibold mt-0.5">ID: ${item.id}</span>
+          </div>
+        </td>
+        <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
+        <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+      `;
+    }
+    
+    tbody.appendChild(tr);
+  });
+
+  // Re-run lucide icons to build the fallback image icon if needed
+  lucide.createIcons();
+
+  // Render pagination controls
+  const paginationContainer = document.getElementById("table-pagination");
+  paginationContainer.innerHTML = `
+    <div>Mostrando ${startIndex + 1} a ${Math.min(startIndex + campaignItemsPerPage, filtered.length)} de ${filtered.length} ${itemsName}</div>
+    <div class="flex gap-2">
+      <button class="bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" id="btn-page-prev" ${campaignCurrentPage === 1 ? 'disabled' : ''}>Anterior</button>
+      <button class="bg-white hover:bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" id="btn-page-next" ${campaignCurrentPage === totalPages ? 'disabled' : ''}>Próxima</button>
+    </div>
+  `;
+
+  // Attach button events
+  document.getElementById("btn-page-prev")?.addEventListener("click", () => {
+    if (campaignCurrentPage > 1) {
+      campaignCurrentPage--;
+      renderCampaignsTable();
+    }
+  });
+
+  document.getElementById("btn-page-next")?.addEventListener("click", () => {
+    if (campaignCurrentPage < totalPages) {
+      campaignCurrentPage++;
+      renderCampaignsTable();
+    }
+  });
+}
+
+// 5. Render Instagram Tab
+function renderInstagramTab() {
+  if (!dashboardData || !dashboardData.ig_stats) return;
+
+  const profile = dashboardData.ig_stats.profile || {};
+  const media = dashboardData.ig_stats.media || [];
+  const ms = dashboardData.meta_stats || {};
+
+  document.getElementById("ig-name").textContent = profile.name || "-";
+  document.getElementById("ig-username").textContent = profile.username ? `@${profile.username}` : "@_";
+  document.getElementById("ig-bio").textContent = profile.biography || "-";
+  document.getElementById("ig-followers").textContent = formatInteger(profile.followers_count || 0);
+  document.getElementById("ig-media-count").textContent = formatInteger(profile.media_count || 0);
+  
   if (profile.profile_picture_url) {
     document.getElementById("ig-profile-img").src = profile.profile_picture_url;
   }
@@ -1207,9 +1402,42 @@ function renderInstagramTab() {
 
   if (media.length === 0) {
     gridContainer.innerHTML = `<div class="col-span-full py-10 text-center text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</div>`;
+    document.getElementById("ig-best-post-container").classList.add("hidden");
     return;
   }
 
+  // Find best engaged post
+  let bestPost = media[0];
+  let maxEngagement = -1;
+  media.forEach(m => {
+    const engagement = (m.like_count || 0) + (m.comments_count || 0);
+    if (engagement > maxEngagement) {
+      maxEngagement = engagement;
+      bestPost = m;
+    }
+  });
+
+  if (bestPost && maxEngagement > 0) {
+    document.getElementById("ig-best-post-container").classList.remove("hidden");
+    document.getElementById("ig-best-post-link").href = bestPost.permalink;
+    
+    let bestUrl = bestPost.media_url;
+    if (bestPost.media_type === "VIDEO" && bestPost.thumbnail_url) {
+      bestUrl = bestPost.thumbnail_url;
+      document.getElementById("ig-best-post-video-icon").classList.remove("hidden");
+    } else {
+      document.getElementById("ig-best-post-video-icon").classList.add("hidden");
+    }
+    
+    document.getElementById("ig-best-post-img").src = bestUrl;
+    document.getElementById("ig-best-post-caption").textContent = bestPost.caption || "Publicação sem legenda.";
+    document.getElementById("ig-best-post-likes").textContent = formatInteger(bestPost.like_count || 0);
+    document.getElementById("ig-best-post-comments").textContent = formatInteger(bestPost.comments_count || 0);
+  } else {
+    document.getElementById("ig-best-post-container").classList.add("hidden");
+  }
+
+  // Render all media in the grid
   media.forEach(m => {
     let mediaUrl = m.media_url;
     if (m.media_type === "VIDEO" && m.thumbnail_url) {

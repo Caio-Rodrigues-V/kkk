@@ -604,7 +604,7 @@ def fetch_raw_live_data():
             ig_profile = json.loads(resp.read().decode("utf-8"))
             
         # Media posts
-        url_m = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&limit=6&access_token={META_ACCESS_TOKEN}"
+        url_m = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,thumbnail_url&limit=50&access_token={META_ACCESS_TOKEN}"
         req_m = urllib.request.Request(url_m, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_m, timeout=15.0) as resp:
             ig_media_res = json.loads(resp.read().decode("utf-8"))
