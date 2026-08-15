@@ -96,13 +96,47 @@ def fetch_redis_mapping():
     return mapping
 
 GLOBAL_FORM_LEADS_CACHE = {}
+
+def fetch_meta_leads_by_ids(lead_ids):
+    """Fetch campaign_id, adset_id, ad_id for a list of lead_ids using Meta Graph API batching."""
+    mappings = {}
+    try:
+        chunk_size = 50
+        for i in range(0, len(lead_ids), chunk_size):
+            chunk = list(lead_ids)[i:i+chunk_size]
+            ids_str = ",".join(str(x) for x in chunk)
+            url = f"https://graph.facebook.com/{META_VERSION}/?ids={ids_str}&fields=id,campaign_id,adset_id,ad_id,field_data&access_token={META_ACCESS_TOKEN}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=15.0) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                for l_id, lead in data.items():
+                    c_id = lead.get("campaign_id")
+                    a_id = lead.get("adset_id")
+                    ad_id = lead.get("ad_id")
+                    
+                    email = ""
+                    for fd in lead.get("field_data", []):
+                        if fd.get("name") == "email":
+                            email = fd.get("values", [""])[0].lower().strip()
+                            
+                    mappings[str(l_id)] = {
+                        "campaign_id": c_id,
+                        "adset_id": a_id,
+                        "ad_id": ad_id
+                    }
+                    if email:
+                        mappings[email] = mappings[str(l_id)]
+    except Exception as e:
+        print("Error fetching meta leads by ids:", e)
+    return mappings
+
 def fetch_meta_form_leads(form_id):
     global GLOBAL_FORM_LEADS_CACHE
     new_mappings = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id&limit=150&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id,field_data&limit=500&access_token={META_ACCESS_TOKEN}"
         pages_fetched = 0
-        while url and pages_fetched < 10:  # limit to max 1500 leads to prevent long hangs
+        while url and pages_fetched < 30:  # limit to max 15000 leads to prevent long hangs
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=15.0) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
@@ -116,12 +150,24 @@ def fetch_meta_form_leads(form_id):
                     c_id = lead.get("campaign_id")
                     a_id = lead.get("adset_id")
                     ad_id = lead.get("ad_id")
+                    
+                    email = ""
+                    for fd in lead.get("field_data", []):
+                        if fd.get("name") == "email":
+                            email = fd.get("values", [""])[0].lower().strip()
+                            
                     if l_id:
                         new_mappings[l_id] = {
                             "campaign_id": c_id,
                             "adset_id": a_id,
                             "ad_id": ad_id
                         }
+                        if email:
+                            new_mappings[email] = {
+                                "campaign_id": c_id,
+                                "adset_id": a_id,
+                                "ad_id": ad_id
+                            }
                         if l_id in GLOBAL_FORM_LEADS_CACHE:
                             has_overlap = True
                             
@@ -570,6 +616,15 @@ def fetch_raw_live_data():
     # 4. Fetch Redis mapping & Meta form leads mapping
     redis_mapping = fetch_redis_mapping()
     form_leads_mapping = fetch_meta_form_leads("2230521901040318")
+    
+    # 5. Fetch details for any lead_ids found in redis that are not in the cache yet
+    missing_lead_ids = [lid for lid in set(redis_mapping.values()) if str(lid) not in form_leads_mapping]
+    if missing_lead_ids:
+        print(f"Fetching details for {len(missing_lead_ids)} missing leads from Meta API...")
+        missing_mappings = fetch_meta_leads_by_ids(missing_lead_ids)
+        form_leads_mapping.update(missing_mappings)
+        # Also update global cache
+        GLOBAL_FORM_LEADS_CACHE.update(missing_mappings)
         
     return {
         "last_updated": datetime.now().isoformat(),
@@ -887,55 +942,58 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
             
         attributed = False
         
-        # 1. Try Redis mapping first
-        lead_id = None
+        c_id, a_id, ad_id = None, None, None
+        
+        # 1. Direct Email Mapping from Meta Forms
         if email:
-            lead_id = redis_mapping.get(email.lower().strip())
-        if not lead_id and phone:
-            clean_phone = "".join(filter(str.isdigit, str(phone)))
-            if len(clean_phone) >= 10:
-                lead_id = redis_mapping.get(clean_phone[-11:])
-                
-        if lead_id:
-            lead_meta = form_leads_mapping.get(lead_id)
-            c_id, a_id, ad_id = None, None, None
-            if isinstance(lead_meta, dict):
+            lead_meta = form_leads_mapping.get(email.lower().strip())
+            if lead_meta and isinstance(lead_meta, dict):
                 c_id = lead_meta.get("campaign_id")
                 a_id = lead_meta.get("adset_id")
                 ad_id = lead_meta.get("ad_id")
-            elif isinstance(lead_meta, str):
-                c_id = lead_meta
                 
-            if c_id:
-                if c_id not in direct_campaigns:
-                    direct_campaigns[c_id] = {"leads": 0, "approved": 0, "activated": 0}
-                if in_creation_range:
-                    direct_campaigns[c_id]["leads"] += 1
-                    if is_qualificado:
-                        direct_campaigns[c_id]["approved"] += 1
-                if is_ativado and in_activation_range:
-                    direct_campaigns[c_id]["activated"] += 1
-                attributed = True
+        # 2. Try Redis mapping fallback (Phone -> Lead ID) if no email matched
+        if not c_id and phone:
+            clean_phone = "".join(filter(str.isdigit, str(phone)))
+            if len(clean_phone) >= 10:
+                lead_id = redis_mapping.get(clean_phone[-11:])
+                if lead_id:
+                    lead_meta = form_leads_mapping.get(str(lead_id))
+                    if lead_meta and isinstance(lead_meta, dict):
+                        c_id = lead_meta.get("campaign_id")
+                        a_id = lead_meta.get("adset_id")
+                        ad_id = lead_meta.get("ad_id")
                 
-            if a_id:
-                if a_id not in direct_adsets:
-                    direct_adsets[a_id] = {"leads": 0, "approved": 0, "activated": 0}
-                if in_creation_range:
-                    direct_adsets[a_id]["leads"] += 1
-                    if is_qualificado:
-                        direct_adsets[a_id]["approved"] += 1
-                if is_ativado and in_activation_range:
-                    direct_adsets[a_id]["activated"] += 1
-                    
-            if ad_id:
-                if ad_id not in direct_ads:
-                    direct_ads[ad_id] = {"leads": 0, "approved": 0, "activated": 0}
-                if in_creation_range:
-                    direct_ads[ad_id]["leads"] += 1
-                    if is_qualificado:
-                        direct_ads[ad_id]["approved"] += 1
-                if is_ativado and in_activation_range:
-                    direct_ads[ad_id]["activated"] += 1
+        if c_id:
+            if c_id not in direct_campaigns:
+                direct_campaigns[c_id] = {"leads": 0, "approved": 0, "activated": 0}
+            if in_creation_range:
+                direct_campaigns[c_id]["leads"] += 1
+                if is_qualificado:
+                    direct_campaigns[c_id]["approved"] += 1
+            if is_ativado and in_activation_range:
+                direct_campaigns[c_id]["activated"] += 1
+            attributed = True
+            
+        if a_id:
+            if a_id not in direct_adsets:
+                direct_adsets[a_id] = {"leads": 0, "approved": 0, "activated": 0}
+            if in_creation_range:
+                direct_adsets[a_id]["leads"] += 1
+                if is_qualificado:
+                    direct_adsets[a_id]["approved"] += 1
+            if is_ativado and in_activation_range:
+                direct_adsets[a_id]["activated"] += 1
+                
+        if ad_id:
+            if ad_id not in direct_ads:
+                direct_ads[ad_id] = {"leads": 0, "approved": 0, "activated": 0}
+            if in_creation_range:
+                direct_ads[ad_id]["leads"] += 1
+                if is_qualificado:
+                    direct_ads[ad_id]["approved"] += 1
+            if is_ativado and in_activation_range:
+                direct_ads[ad_id]["activated"] += 1
                 
         # 2. Fallback to direct UTM campaign mapping
         if not attributed:
