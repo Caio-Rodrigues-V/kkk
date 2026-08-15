@@ -44,7 +44,7 @@ is_fetching = False
 
 # Redis mapping functions
 def fetch_redis_mapping():
-    redis_url = os.environ.get("REDIS_URL") or os.environ.get("REDIS_PUBLIC_URL")
+    redis_url = os.environ.get("REDIS_URL") or os.environ.get("REDIS_PUBLIC_URL") or "redis://default:mjTjWqoAftmUpGClcZLBngHtraYbKgMP@tokaido.proxy.rlwy.net:58975"
     redis_host = os.environ.get("REDISHOST")
     redis_port = int(os.environ.get("REDISPORT", 6379))
     redis_password = os.environ.get("REDISPASSWORD") or os.environ.get("REDIS_PASSWORD")
@@ -136,7 +136,7 @@ def fetch_meta_form_leads(form_id):
     try:
         url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id,field_data&limit=500&access_token={META_ACCESS_TOKEN}"
         pages_fetched = 0
-        while url and pages_fetched < 30:  # limit to max 15000 leads to prevent long hangs
+        while url and pages_fetched < 100:  # limit to max 50000 leads to prevent long hangs
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=15.0) as resp:
                 res = json.loads(resp.read().decode("utf-8"))
