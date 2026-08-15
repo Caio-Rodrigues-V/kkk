@@ -200,7 +200,7 @@ CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
 def fetch_meta_campaigns_metadata():
     campaigns_meta = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=150&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
@@ -213,7 +213,7 @@ def fetch_meta_campaigns_metadata():
 def fetch_meta_adsets_metadata():
     adsets_meta = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/adsets?fields=name,status,effective_status,campaign_id&limit=150&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/adsets?fields=name,status,effective_status,campaign_id&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
@@ -226,7 +226,7 @@ def fetch_meta_adsets_metadata():
 def fetch_meta_ads_metadata():
     ads_meta = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url}}&limit=150&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
@@ -249,7 +249,7 @@ def get_custom_meta_campaigns(start_date, end_date):
     try:
         campaigns_meta = fetch_meta_campaigns_metadata()
         time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&time_range={time_range}&limit=100&access_token={META_ACCESS_TOKEN}"
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&time_range={time_range}&limit=1000&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
@@ -288,7 +288,7 @@ def get_custom_meta_campaigns(start_date, end_date):
 def fetch_meta_campaigns(preset, campaigns_meta):
     meta_campaigns = []
     try:
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset={preset}&limit=100&access_token={META_ACCESS_TOKEN}"
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
@@ -325,7 +325,7 @@ def fetch_meta_campaigns(preset, campaigns_meta):
 def fetch_meta_adsets(preset, adsets_meta):
     adsets = []
     try:
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&date_preset={preset}&limit=150&access_token={META_ACCESS_TOKEN}"
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
@@ -362,7 +362,7 @@ def fetch_meta_adsets(preset, adsets_meta):
 def fetch_meta_ads(preset, ads_meta):
     ads = []
     try:
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=ad&fields=ad_id,spend,impressions,clicks,actions&date_preset={preset}&limit=150&access_token={META_ACCESS_TOKEN}"
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=ad&fields=ad_id,spend,impressions,clicks,actions&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
@@ -414,7 +414,7 @@ def get_custom_meta_adsets(start_date, end_date):
     try:
         adsets_meta = fetch_meta_adsets_metadata()
         time_range = urllib.parse.quote(json.dumps({"since": start_date, "until": end_date}))
-        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&time_range={time_range}&limit=150&access_token={META_ACCESS_TOKEN}"
+        url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&time_range={time_range}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req_i, timeout=15.0) as resp:
             insights_res = json.loads(resp.read().decode("utf-8"))
