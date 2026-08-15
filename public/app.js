@@ -461,6 +461,9 @@ function renderOverviewTab() {
   renderOverviewSpendChart(ds.daily_trend);
   renderOverviewCPLChart(ds.daily_trend);
   renderOverviewFunnel(ds);
+
+  // Render Instagram Tab
+  renderInstagramTab();
 }
 
 // Render CPA circular progress using ApexCharts
@@ -1026,8 +1029,6 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right">Apps ativados</th>
-        <th class="px-6 py-4 text-right text-emerald-600">Custo/App Ativado</th>
       </tr>
     `;
   } else if (activeSubTab === "adsets") {
@@ -1040,8 +1041,6 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right">Apps ativados</th>
-        <th class="px-6 py-4 text-right text-emerald-600">Custo/App Ativado</th>
       </tr>
     `;
   } else {
@@ -1054,8 +1053,6 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right">Apps ativados</th>
-        <th class="px-6 py-4 text-right text-emerald-600">Custo/App Ativado</th>
       </tr>
     `;
   }
@@ -1119,8 +1116,6 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right font-bold text-emerald-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-emerald-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     } else if (activeSubTab === "adsets") {
       tr.innerHTML = `
@@ -1130,8 +1125,6 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right font-bold text-emerald-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-emerald-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     } else {
       const imgTag = item.thumbnail_url 
@@ -1151,8 +1144,6 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right font-bold text-emerald-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-emerald-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     }
     
@@ -1186,4 +1177,69 @@ function renderCampaignsTable() {
       renderCampaignsTable();
     }
   });
+}
+
+// 5. Render Instagram Tab
+function renderInstagramTab() {
+  if (!dashboardData || !dashboardData.ig_stats) return;
+
+  const profile = dashboardData.ig_stats.profile || {};
+  const media = dashboardData.ig_stats.media || [];
+  const ms = dashboardData.meta_stats || {};
+
+  document.getElementById("ig-name").textContent = profile.name || "-";
+  document.getElementById("ig-username").textContent = profile.username ? `@${profile.username}` : "@_";
+  document.getElementById("ig-bio").textContent = profile.biography || "-";
+  document.getElementById("ig-followers").textContent = formatInteger(profile.followers_count || 0);
+  document.getElementById("ig-media-count").textContent = formatInteger(profile.media_count || 0);
+  
+  if (profile.profile_picture_url) {
+    document.getElementById("ig-profile-img").src = profile.profile_picture_url;
+  }
+
+  // Spend for profile visits
+  document.getElementById("ig-spend").textContent = formatCurrency(ms.profile_visit_spend || 0);
+
+  const gridContainer = document.getElementById("ig-media-grid");
+  if (!gridContainer) return;
+  
+  gridContainer.innerHTML = "";
+
+  if (media.length === 0) {
+    gridContainer.innerHTML = `<div class="col-span-full py-10 text-center text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</div>`;
+    return;
+  }
+
+  media.forEach(m => {
+    let mediaUrl = m.media_url;
+    if (m.media_type === "VIDEO" && m.thumbnail_url) {
+      mediaUrl = m.thumbnail_url;
+    }
+
+    const caption = m.caption ? m.caption.substring(0, 80) + "..." : "";
+    
+    gridContainer.innerHTML += `
+      <a href="${m.permalink}" target="_blank" class="block bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 group">
+        <div class="aspect-square bg-slate-100 relative overflow-hidden">
+          <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+          ${m.media_type === 'VIDEO' ? `<div class="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full backdrop-blur-sm"><i data-lucide="video" class="w-3.5 h-3.5"></i></div>` : ''}
+        </div>
+        <div class="p-4">
+          <p class="text-xs font-semibold text-slate-600 line-clamp-2 mb-3 leading-relaxed">${caption}</p>
+          <div class="flex items-center gap-4 border-t border-slate-50 pt-3">
+            <div class="flex items-center gap-1.5 text-rose-500">
+              <i data-lucide="heart" class="w-4 h-4 fill-rose-500/20"></i>
+              <span class="text-xs font-bold">${formatInteger(m.like_count || 0)}</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-blue-500">
+              <i data-lucide="message-circle" class="w-4 h-4 fill-blue-500/20"></i>
+              <span class="text-xs font-bold">${formatInteger(m.comments_count || 0)}</span>
+            </div>
+          </div>
+        </div>
+      </a>
+    `;
+  });
+  
+  lucide.createIcons();
 }

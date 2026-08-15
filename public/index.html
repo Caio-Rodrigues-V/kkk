@@ -115,6 +115,13 @@
             <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Anúncios e qualificados</span>
           </div>
         </button>
+        <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left" data-tab="instagram">
+          <i data-lucide="instagram" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
+          <div class="flex flex-col leading-tight">
+            <span class="text-sm font-semibold text-white">Instagram</span>
+            <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Métricas do perfil</span>
+          </div>
+        </button>
       </nav>
       
       <!-- Footer -->
@@ -677,6 +684,58 @@
               <!-- Injected via JS -->
             </div>
           </div>
+        </div>
+
+        <!-- PAGE: Instagram -->
+        <div id="page-instagram" class="tab-page hidden space-y-8">
+          
+          <!-- Profile Header Card -->
+          <div class="bg-gradient-to-br from-indigo-500 via-purple-600 to-rose-500 rounded-3xl p-1 shadow-lg shadow-purple-500/20">
+            <div class="bg-white rounded-[22px] p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8 h-full relative overflow-hidden">
+              <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-purple-100 to-rose-50 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2"></div>
+              
+              <div class="w-24 h-24 md:w-32 md:h-32 rounded-full p-1 bg-gradient-to-tr from-yellow-400 via-rose-500 to-purple-600 flex-shrink-0 relative z-10">
+                <img id="ig-profile-img" src="" class="w-full h-full rounded-full object-cover border-4 border-white bg-white">
+              </div>
+              
+              <div class="flex flex-col flex-grow text-center md:text-left relative z-10">
+                <div class="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 mb-2">
+                  <h2 class="text-2xl md:text-3xl font-black text-slate-800 tracking-tight" id="ig-name">-</h2>
+                  <span class="text-sm font-bold text-purple-600 bg-purple-50 px-3 py-1 rounded-full w-fit mx-auto md:mx-0" id="ig-username">@_</span>
+                </div>
+                <p class="text-sm font-medium text-slate-500 max-w-xl mb-6" id="ig-bio">-</p>
+                
+                <div class="flex flex-wrap items-center justify-center md:justify-start gap-4 md:gap-10">
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-black text-slate-800" id="ig-followers">0</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Seguidores</span>
+                  </div>
+                  <div class="w-px h-8 bg-slate-100 hidden sm:block"></div>
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-black text-slate-800" id="ig-media-count">0</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Publicações</span>
+                  </div>
+                  <div class="w-px h-8 bg-slate-100 hidden sm:block"></div>
+                  <div class="flex flex-col">
+                    <span class="text-2xl font-black text-purple-600" id="ig-spend">R$ 0,00</span>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Investido em Branding</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Media Grid -->
+          <div>
+            <h3 class="text-lg font-extrabold text-slate-800 mb-6 flex items-center gap-2">
+              <i data-lucide="grid" class="w-5 h-5 text-purple-600"></i>
+              Publicações Recentes
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="ig-media-grid">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
         </div>
 
       </div>
