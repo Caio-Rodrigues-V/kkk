@@ -1154,6 +1154,19 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
                 "data": data
             }
             self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
+        elif parsed_url.path == "/api/debug-meta":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            try:
+                # Puxa 1 lead recente pra gente ver exatamente o que a Meta entrega
+                url = f"https://graph.facebook.com/{META_VERSION}/2230521901040318/leads?fields=id,campaign_id,adset_id,ad_id,field_data&limit=1&access_token={META_ACCESS_TOKEN}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    self.wfile.write(json.dumps(res).encode("utf-8"))
+            except Exception as e:
+                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
         elif parsed_url.path == "/api/sync":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
