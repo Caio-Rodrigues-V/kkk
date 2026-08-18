@@ -893,7 +893,9 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right">Apps ativos</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
       </tr>
     `;
   } else if (activeSubTab === "adsets") {
@@ -905,7 +907,9 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right">Apps ativos</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
       </tr>
     `;
   } else {
@@ -917,7 +921,9 @@ function renderCampaignsTable() {
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
         <th class="px-6 py-4 text-right">Cadastros qualificados</th>
+        <th class="px-6 py-4 text-right">Apps ativos</th>
         <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
+        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
       </tr>
     `;
   }
@@ -980,7 +986,9 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     } else if (activeSubTab === "adsets") {
       tr.innerHTML = `
@@ -989,7 +997,9 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     } else {
       const imgTag = item.thumbnail_url 
@@ -1008,7 +1018,9 @@ function renderCampaignsTable() {
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
         <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
+        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
         <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
+        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
       `;
     }
     
