@@ -231,23 +231,11 @@ def fetch_meta_adsets_metadata():
 def fetch_meta_ads_metadata():
     ads_meta = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url,object_story_spec}}&limit=5000&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             for a in res.get("data", []):
-                # Extract lead_gen_form_id if present
-                f_id = None
-                try:
-                    creative = a.get("creative", {})
-                    oss = creative.get("object_story_spec", {})
-                    if "video_data" in oss:
-                        f_id = oss["video_data"].get("call_to_action", {}).get("value", {}).get("lead_gen_form_id")
-                    elif "link_data" in oss:
-                        f_id = oss["link_data"].get("call_to_action", {}).get("value", {}).get("lead_gen_form_id")
-                except:
-                    pass
-                a["lead_gen_form_id"] = f_id
                 ads_meta[a["id"]] = a
     except Exception as e:
         print("Error fetching Meta Ads metadata:", e)
@@ -597,13 +585,9 @@ def fetch_raw_live_data():
     adsets_meta = fetch_meta_adsets_metadata()
     ads_meta = fetch_meta_ads_metadata()
     
-    # Extract unique form IDs from ads metadata
-    form_ids = set()
-    for ad in ads_meta.values():
-        fid = ad.get("lead_gen_form_id")
-        if fid:
-            form_ids.add(fid)
-    print(f"Discovered {len(form_ids)} lead generation forms from ads metadata.")
+    # Form IDs to track (We will add the old ones here later)
+    form_ids = ["2230521901040318"]
+    print(f"Tracking lead generation forms: {form_ids}")
     
     presets_map = {
         "all": "maximum",
