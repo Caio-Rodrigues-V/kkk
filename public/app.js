@@ -1209,8 +1209,6 @@ function renderInstagramTab() {
     if(bestPostContainer) bestPostContainer.classList.add("hidden");
     return;
   }
-  
-  tableBody.innerHTML = `<tr><td colspan="10">DEBUG: STARTING LOOP WITH ${media.length} ITEMS</td></tr>`;
 
   // Find best engaged post
   let bestPost = media[0];
