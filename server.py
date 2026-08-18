@@ -586,7 +586,13 @@ def fetch_raw_live_data():
     ads_meta = fetch_meta_ads_metadata()
     
     # Form IDs to track (We will add the old ones here later)
-    form_ids = ["2230521901040318"]
+    form_ids = [
+        "2230521901040318", # Form V5 (Ativo)
+        "1047323807697738", # Desativado
+        "2184251165469840", # Desativado
+        "1594114028736919", # Desativado
+        "803818399423508"   # Desativado
+    ]
     print(f"Tracking lead generation forms: {form_ids}")
     
     presets_map = {
