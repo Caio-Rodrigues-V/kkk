@@ -131,59 +131,63 @@ def fetch_meta_leads_by_ids(lead_ids):
         print("Error fetching meta leads by ids:", e)
     return mappings
 
-def fetch_meta_form_leads(form_id):
+def fetch_meta_form_leads(form_ids):
     global GLOBAL_FORM_LEADS_CACHE
     new_mappings = {}
-    try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id,field_data&limit=500&access_token={META_ACCESS_TOKEN}"
-        pages_fetched = 0
-        while url and pages_fetched < 100:  # limit to max 50000 leads to prevent long hangs
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=15.0) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                data = res.get("data", [])
-                if not data:
-                    break
-                    
-                has_overlap = False
-                for lead in data:
-                    l_id = lead.get("id")
-                    c_id = lead.get("campaign_id")
-                    a_id = lead.get("adset_id")
-                    ad_id = lead.get("ad_id")
-                    
-                    email = ""
-                    for fd in lead.get("field_data", []):
-                        if fd.get("name") == "email":
-                            email = fd.get("values", [""])[0].lower().strip()
-                            
-                    if l_id:
-                        new_mappings[l_id] = {
-                            "campaign_id": c_id,
-                            "adset_id": a_id,
-                            "ad_id": ad_id
-                        }
-                        if email:
-                            new_mappings[email] = {
+    if not form_ids:
+        return GLOBAL_FORM_LEADS_CACHE.copy()
+        
+    for form_id in form_ids:
+        try:
+            url = f"https://graph.facebook.com/{META_VERSION}/{form_id}/leads?fields=id,campaign_id,adset_id,ad_id,field_data&limit=500&access_token={META_ACCESS_TOKEN}"
+            pages_fetched = 0
+            while url and pages_fetched < 100:  # limit to max 50000 leads per form
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req, timeout=15.0) as resp:
+                    res = json.loads(resp.read().decode("utf-8"))
+                    data = res.get("data", [])
+                    if not data:
+                        break
+                        
+                    has_overlap = False
+                    for lead in data:
+                        l_id = lead.get("id")
+                        c_id = lead.get("campaign_id")
+                        a_id = lead.get("adset_id")
+                        ad_id = lead.get("ad_id")
+                        
+                        email = ""
+                        for fd in lead.get("field_data", []):
+                            if fd.get("name") == "email":
+                                email = fd.get("values", [""])[0].lower().strip()
+                                
+                        if l_id:
+                            new_mappings[l_id] = {
                                 "campaign_id": c_id,
                                 "adset_id": a_id,
                                 "ad_id": ad_id
                             }
-                        if l_id in GLOBAL_FORM_LEADS_CACHE:
-                            has_overlap = True
-                            
-                if has_overlap:
-                    break
-                    
-                paging = res.get("paging", {})
-                url = paging.get("next")
-                pages_fetched += 1
-                
-        GLOBAL_FORM_LEADS_CACHE.update(new_mappings)
-        print(f"Form leads cache size: {len(GLOBAL_FORM_LEADS_CACHE)} (added {len(new_mappings)} in this sync).")
-    except Exception as e:
-        print(f"Error fetching leads for form {form_id}:", e)
-    return GLOBAL_FORM_LEADS_CACHE
+                            if email:
+                                new_mappings[email] = {
+                                    "campaign_id": c_id,
+                                    "adset_id": a_id,
+                                    "ad_id": ad_id
+                                }
+                            if l_id in GLOBAL_FORM_LEADS_CACHE:
+                                has_overlap = True
+                                
+                    if has_overlap:
+                        break
+                        
+                    paging = res.get("paging", {})
+                    url = paging.get("next")
+                    pages_fetched += 1
+        except Exception as e:
+            print(f"Error fetching leads for form {form_id}:", e)
+            
+    GLOBAL_FORM_LEADS_CACHE.update(new_mappings)
+    print(f"Form leads cache size: {len(GLOBAL_FORM_LEADS_CACHE)} (added {len(new_mappings)} in this sync).")
+    return GLOBAL_FORM_LEADS_CACHE.copy()
 
 def get_campaign_for_lead(lead_id, form_leads_mapping):
     if lead_id in form_leads_mapping:
@@ -227,11 +231,23 @@ def fetch_meta_adsets_metadata():
 def fetch_meta_ads_metadata():
     ads_meta = {}
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{id,thumbnail_url,object_story_spec}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
             for a in res.get("data", []):
+                # Extract lead_gen_form_id if present
+                f_id = None
+                try:
+                    creative = a.get("creative", {})
+                    oss = creative.get("object_story_spec", {})
+                    if "video_data" in oss:
+                        f_id = oss["video_data"].get("call_to_action", {}).get("value", {}).get("lead_gen_form_id")
+                    elif "link_data" in oss:
+                        f_id = oss["link_data"].get("call_to_action", {}).get("value", {}).get("lead_gen_form_id")
+                except:
+                    pass
+                a["lead_gen_form_id"] = f_id
                 ads_meta[a["id"]] = a
     except Exception as e:
         print("Error fetching Meta Ads metadata:", e)
@@ -581,6 +597,14 @@ def fetch_raw_live_data():
     adsets_meta = fetch_meta_adsets_metadata()
     ads_meta = fetch_meta_ads_metadata()
     
+    # Extract unique form IDs from ads metadata
+    form_ids = set()
+    for ad in ads_meta.values():
+        fid = ad.get("lead_gen_form_id")
+        if fid:
+            form_ids.add(fid)
+    print(f"Discovered {len(form_ids)} lead generation forms from ads metadata.")
+    
     presets_map = {
         "all": "maximum",
         "7days": "last_7d",
@@ -665,9 +689,10 @@ def fetch_raw_live_data():
     except Exception as e:
         print("Error fetching Instagram data:", e)
         
-    # 4. Fetch Redis mapping & Meta form leads mapping
+    # 4. Fetch Meta Form Leads based on discovered form IDs
     redis_mapping = fetch_redis_mapping()
-    form_leads_mapping = fetch_meta_form_leads("2230521901040318")
+    print(f"Fetching meta leads for forms: {form_ids}")
+    form_leads_mapping = fetch_meta_form_leads(list(form_ids))
     
     # 5. Fetch details for any lead_ids found in redis that are not in the cache yet
     missing_lead_ids = [lid for lid in set(redis_mapping.values()) if str(lid) not in form_leads_mapping]
