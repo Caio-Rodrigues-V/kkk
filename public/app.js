@@ -1181,14 +1181,12 @@ function renderCampaignsTable() {
 
 // 5. Render Instagram Tab
 function renderInstagramTab() {
-  if (!dashboardData || !dashboardData.ig_stats) return;
+  try {
+    const profile = dashboardData.ig_profile || {};
+    const media = dashboardData.ig_media || [];
+    const ms = dashboardData.meta_daily_spend || {};
 
-  const profile = dashboardData.ig_stats.profile || {};
-  const media = dashboardData.ig_stats.media || [];
-  const ms = dashboardData.meta_stats || {};
-
-  document.getElementById("ig-name").textContent = profile.name || "-";
-  document.getElementById("ig-username").textContent = profile.username ? `@${profile.username}` : "@_";
+    document.getElementById("ig-username").textContent = profile.username ? `@${profile.username}` : "@_";
   document.getElementById("ig-bio").textContent = profile.biography || "-";
   document.getElementById("ig-followers").textContent = formatInteger(profile.followers_count || 0);
   document.getElementById("ig-media-count").textContent = formatInteger(profile.media_count || 0);
@@ -1295,4 +1293,8 @@ function renderInstagramTab() {
   });
   
   lucide.createIcons();
+  } catch (error) {
+    console.error("Error in renderInstagramTab:", error);
+    alert("Erro na aba Instagram: " + error.message + "\nLinha: " + error.stack);
+  }
 }
