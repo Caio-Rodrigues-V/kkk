@@ -609,7 +609,27 @@ def fetch_raw_live_data():
         with urllib.request.urlopen(req_m, timeout=15.0) as resp:
             ig_media_res = json.loads(resp.read().decode("utf-8"))
             ig_media = ig_media_res.get("data", [])
-        print("Fetched Instagram profile and recent media.")
+            
+        print(f"Fetched {len(ig_media)} Instagram media items. Fetching insights...")
+        
+        # Fetch insights for each media
+        for m in ig_media:
+            try:
+                metrics = "plays,reach,saved,shares,total_interactions" if m.get("media_type") == "VIDEO" else "impressions,reach,saved,shares,total_interactions"
+                url_ins = f"https://graph.facebook.com/{META_VERSION}/{m['id']}/insights?metric={metrics}&access_token={META_ACCESS_TOKEN}"
+                req_ins = urllib.request.Request(url_ins, headers={"User-Agent": "Mozilla/5.0"})
+                with urllib.request.urlopen(req_ins, timeout=10.0) as resp_ins:
+                    ins_data = json.loads(resp_ins.read().decode("utf-8")).get("data", [])
+                    for metric in ins_data:
+                        name = metric.get("name")
+                        values = metric.get("values", [])
+                        if values:
+                            m[name] = values[0].get("value", 0)
+            except Exception as e:
+                # Some metrics might not be available for very old posts or certain types
+                pass
+                
+        print("Fetched Instagram profile and recent media with insights.")
     except Exception as e:
         print("Error fetching Instagram data:", e)
         

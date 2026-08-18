@@ -1200,13 +1200,13 @@ function renderInstagramTab() {
   // Spend for profile visits
   document.getElementById("ig-spend").textContent = formatCurrency(ms.profile_visit_spend || 0);
 
-  const gridContainer = document.getElementById("ig-media-grid");
-  if (!gridContainer) return;
+  const tableBody = document.getElementById("ig-media-table-body");
+  if (!tableBody) return;
   
-  gridContainer.innerHTML = "";
+  tableBody.innerHTML = "";
 
   if (media.length === 0) {
-    gridContainer.innerHTML = `<div class="col-span-full py-10 text-center text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</div>`;
+    tableBody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</td></tr>`;
     const bestPostContainer = document.getElementById("ig-best-post-container");
     if(bestPostContainer) bestPostContainer.classList.add("hidden");
     return;
@@ -1250,29 +1250,48 @@ function renderInstagramTab() {
       mediaUrl = m.thumbnail_url;
     }
 
-    const caption = m.caption ? m.caption.substring(0, 80) + "..." : "";
+    const caption = m.caption ? m.caption.substring(0, 60) + "..." : "Publicação sem legenda";
+    const typeLabel = m.media_type === "VIDEO" ? "Reels" : (m.media_type === "CAROUSEL_ALBUM" ? "Carrossel" : "Imagem");
     
-    gridContainer.innerHTML += `
-      <a href="${m.permalink}" target="_blank" class="block bg-white border border-slate-100 rounded-2xl overflow-hidden hover:shadow-lg transition-all hover:-translate-y-1 group">
-        <div class="aspect-square bg-slate-100 relative overflow-hidden">
-          <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-          ${m.media_type === 'VIDEO' ? `<div class="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full backdrop-blur-sm"><i data-lucide="video" class="w-3.5 h-3.5"></i></div>` : ''}
-        </div>
-        <div class="p-4">
-          <p class="text-xs font-semibold text-slate-600 line-clamp-2 mb-3 leading-relaxed">${caption}</p>
-          <div class="flex items-center gap-4 border-t border-slate-50 pt-3">
-            <div class="flex items-center gap-1.5 text-rose-500">
-              <i data-lucide="heart" class="w-4 h-4 fill-rose-500/20"></i>
-              <span class="text-xs font-bold">${formatInteger(m.like_count || 0)}</span>
-            </div>
-            <div class="flex items-center gap-1.5 text-blue-500">
-              <i data-lucide="message-circle" class="w-4 h-4 fill-blue-500/20"></i>
-              <span class="text-xs font-bold">${formatInteger(m.comments_count || 0)}</span>
-            </div>
+    // Insights metrics (defaulting to 0 or - if not fetched yet)
+    const views = m.plays || m.video_views || m.impressions || "-";
+    const reach = m.reach || "-";
+    const saved = m.saved || "-";
+    const shares = m.shares || "-";
+    
+    const likes = m.like_count || 0;
+    const comments = m.comments_count || 0;
+    
+    const interactions = m.total_interactions || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
+    
+    let interactionRate = "-";
+    if (reach !== "-" && parseInt(reach) > 0) {
+      interactionRate = formatPercentage(interactions / parseInt(reach));
+    }
+
+    const tr = document.createElement("tr");
+    tr.className = "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0";
+    tr.innerHTML = `
+      <td class="px-6 py-4">
+        <a href="${m.permalink}" target="_blank" class="flex items-center gap-4 group">
+          <div class="w-12 h-12 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
+            <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+            ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
           </div>
-        </div>
-      </a>
+          <p class="text-xs font-semibold text-slate-700 w-48 whitespace-normal line-clamp-2">${caption}</p>
+        </a>
+      </td>
+      <td class="px-6 py-4 font-medium text-slate-600">${typeLabel}</td>
+      <td class="px-6 py-4 text-right font-semibold">${views !== "-" ? formatInteger(views) : "-"}</td>
+      <td class="px-6 py-4 text-right font-semibold text-blue-600">${reach !== "-" ? formatInteger(reach) : "-"}</td>
+      <td class="px-6 py-4 text-right font-semibold">${formatInteger(interactions)}</td>
+      <td class="px-6 py-4 text-right font-semibold text-emerald-600">${interactionRate}</td>
+      <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(likes)}</td>
+      <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(comments)}</td>
+      <td class="px-6 py-4 text-right font-semibold text-slate-700">${saved !== "-" ? formatInteger(saved) : "-"}</td>
+      <td class="px-6 py-4 text-right font-semibold text-slate-700">${shares !== "-" ? formatInteger(shares) : "-"}</td>
     `;
+    tableBody.appendChild(tr);
   });
   
   lucide.createIcons();

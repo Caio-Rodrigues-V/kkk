@@ -742,14 +742,31 @@
             </a>
           </div>
 
-          <!-- Recent Media Grid -->
-          <div>
-            <h3 class="text-lg font-extrabold text-slate-800 mb-6 flex items-center gap-2">
-              <i data-lucide="grid" class="w-5 h-5 text-purple-600"></i>
-              Publicações Recentes
-            </h3>
-            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" id="ig-media-grid">
-              <!-- Injected via JS -->
+          <!-- Posts Table -->
+          <div class="mt-8">
+            <h3 class="text-lg font-extrabold text-slate-800 mb-6">Últimas Publicações</h3>
+            <div class="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-600 whitespace-nowrap">
+                  <thead class="bg-slate-50/50 text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100">
+                    <tr>
+                      <th class="px-6 py-4">Postagem</th>
+                      <th class="px-6 py-4">Tipo</th>
+                      <th class="px-6 py-4 text-right">Visualizações</th>
+                      <th class="px-6 py-4 text-right text-blue-600">Alcance &darr;</th>
+                      <th class="px-6 py-4 text-right">Interações</th>
+                      <th class="px-6 py-4 text-right">Taxa de Interação</th>
+                      <th class="px-6 py-4 text-right">Curtidas</th>
+                      <th class="px-6 py-4 text-right">Comentários</th>
+                      <th class="px-6 py-4 text-right">Salvo</th>
+                      <th class="px-6 py-4 text-right">Compartilhamentos</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ig-media-table-body">
+                    <!-- Table rows injected here -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
