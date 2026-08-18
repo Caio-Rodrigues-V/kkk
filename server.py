@@ -164,7 +164,7 @@ def fetch_meta_form_leads(form_ids):
                                 fd_vals = fd.get("values")
                                 if fd_vals and isinstance(fd_vals, list) and len(fd_vals) > 0:
                                     email = str(fd_vals[0]).lower().strip()
-                            elif "phone" in fname or "celular" in fname or "telefone" in fname:
+                            elif "phone" in fname or "celular" in fname or "telefone" in fname or "whatsapp" in fname or "wpp" in fname:
                                 fd_vals = fd.get("values")
                                 if fd_vals and isinstance(fd_vals, list) and len(fd_vals) > 0:
                                     raw_phone = str(fd_vals[0])
