@@ -1207,13 +1207,18 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
-            response_payload = {
-                "status": "success",
-                "is_fetching": is_fetching,
-                "data": data
-            }
-            self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
+            try:
+                data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
+                response_payload = {
+                    "status": "success",
+                    "is_fetching": is_fetching,
+                    "data": data
+                }
+                self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                import traceback
+                error_payload = {"error": str(e), "traceback": traceback.format_exc()}
+                self.wfile.write(json.dumps(error_payload, ensure_ascii=False).encode("utf-8"))
         elif parsed_url.path == "/api/debug-meta":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -1236,13 +1241,18 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
             # Start background sync
             start_background_fetch()
             
-            data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
-            response_payload = {
-                "status": "syncing",
-                "is_fetching": True,
-                "data": data
-            }
-            self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
+            try:
+                data = get_processed_data(exclude_internal=exclude_internal, date_range=date_range, start_date=start_date, end_date=end_date)
+                response_payload = {
+                    "status": "syncing",
+                    "is_fetching": True,
+                    "data": data
+                }
+                self.wfile.write(json.dumps(response_payload, ensure_ascii=False).encode("utf-8"))
+            except Exception as e:
+                import traceback
+                error_payload = {"error": str(e), "traceback": traceback.format_exc()}
+                self.wfile.write(json.dumps(error_payload, ensure_ascii=False).encode("utf-8"))
         else:
             # Fallback to serving static files from public/
             super().do_GET()
