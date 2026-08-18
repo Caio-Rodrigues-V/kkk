@@ -1139,11 +1139,15 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     
     for c in meta_campaigns:
         obj = c.get("objective", "").upper()
-        is_lead_camp = (obj in ["OUTCOME_LEADS", "LEAD_GENERATION"]) or (c.get("leads", 0) > 0) or ("FORMS" in c["name"].upper()) or ("LEADS" in c["name"].upper())
-        if is_lead_camp:
-            lead_campaign_spend += c["spend"]
-        else:
+        
+        # Branding: Alcance e Reconhecimento
+        is_branding = obj in ["OUTCOME_AWARENESS", "REACH", "BRAND_AWARENESS", "AWARENESS"]
+        
+        if is_branding:
             profile_visit_spend += c["spend"]
+        else:
+            # Leads: Tráfego, Conversões, Engajamento (Mensagens) e Cadastros
+            lead_campaign_spend += c["spend"]
             
     aggregated_data = {
         "last_updated": raw_data.get("last_updated"),
