@@ -588,11 +588,23 @@ def fetch_raw_live_data():
         "thismonth": "this_month",
         "lastmonth": "last_month"
     }
-    for range_key, preset in presets_map.items():
-        meta_campaigns_by_preset[range_key] = fetch_meta_campaigns(preset, campaigns_meta)
-        meta_adsets_by_preset[range_key] = fetch_meta_adsets(preset, adsets_meta)
-        meta_ads_by_preset[range_key] = fetch_meta_ads(preset, ads_meta)
-        meta_daily_spend_by_preset[range_key] = fetch_meta_daily_spend(preset)
+    # Parallelize preset fetching to speed up loading
+    def fetch_preset_data(preset_item):
+        range_key, preset = preset_item
+        return (
+            range_key,
+            fetch_meta_campaigns(preset, campaigns_meta),
+            fetch_meta_adsets(preset, adsets_meta),
+            fetch_meta_ads(preset, ads_meta),
+            fetch_meta_daily_spend(preset)
+        )
+        
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        for range_key, c, ad, a, ds in executor.map(fetch_preset_data, presets_map.items()):
+            meta_campaigns_by_preset[range_key] = c
+            meta_adsets_by_preset[range_key] = ad
+            meta_ads_by_preset[range_key] = a
+            meta_daily_spend_by_preset[range_key] = ds
 
     # 3. Fetch Instagram profile & media
     ig_profile = {}
