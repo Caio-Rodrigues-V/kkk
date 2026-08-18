@@ -84,13 +84,7 @@
             <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Métricas principais</span>
           </div>
         </button>
-        <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left" data-tab="journey">
-          <i data-lucide="trending-up" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
-          <div class="flex flex-col leading-tight">
-            <span class="text-sm font-semibold text-white">Jornada do Lead</span>
-            <span class="text-[10px] text-purple-300/60 group-hover:text-purple-200/80 transition-colors">Do cadastro à ativação</span>
-          </div>
-        </button>
+
         <button class="menu-item group flex items-center gap-3.5 px-4 py-3.5 rounded-xl text-purple-200 hover:text-white hover:bg-white/5 transition-all duration-200 text-left" data-tab="campaigns">
           <i data-lucide="megaphone" class="w-5 h-5 opacity-75 group-hover:opacity-100 transition-opacity"></i>
           <div class="flex flex-col leading-tight">
@@ -438,60 +432,7 @@
           </div>
         </div>
 
-        <!-- 2. LEAD JOURNEY PAGE -->
-        <div id="page-journey" class="tab-page hidden space-y-8">
-          <div>
-            <h1 class="text-2xl font-extrabold tracking-tight text-slate-800">Jornada do Lead</h1>
-            <p class="text-xs text-slate-500 mt-1">Acompanhamento do funil de conversão, evolução diária e distribuição demográfica dos leads no backoffice.</p>
-          </div>
 
-          <!-- Daily detail line chart -->
-          <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6">
-            <div class="mb-4">
-              <h3 class="text-sm font-extrabold text-slate-800">Histórico de Performance</h3>
-              <span class="text-xs text-slate-400">Linha do tempo diária desde o primeiro convite</span>
-            </div>
-            <div id="daily-detail-chart" class="h-[400px] w-full"></div>
-          </div>
-
-          <!-- Demographics breakdown grid -->
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- School Type -->
-            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
-              <div class="mb-6">
-                <h3 class="text-sm font-extrabold text-slate-800">Tipo de Escola</h3>
-                <span class="text-xs text-slate-400">Escola Pública vs Particular vs Bolsista</span>
-              </div>
-              <div class="flex-grow flex items-center justify-center min-h-[280px]">
-                <div id="chart-school-breakdown" class="w-full max-w-[320px]"></div>
-              </div>
-            </div>
-
-            <!-- Device Type -->
-            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
-              <div class="mb-6">
-                <h3 class="text-sm font-extrabold text-slate-800">Tipo de Dispositivo / Canal</h3>
-                <span class="text-xs text-slate-400">Distribuição iOS vs Android</span>
-              </div>
-              <div class="flex-grow flex items-center justify-center min-h-[280px]">
-                <div id="chart-device-breakdown" class="w-full max-w-[320px]"></div>
-              </div>
-            </div>
-
-            <!-- Lead Origin -->
-            <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 flex flex-col">
-              <div class="mb-6">
-                <h3 class="text-sm font-extrabold text-slate-800">Origem de Cadastro</h3>
-                <span class="text-xs text-slate-400">De onde vieram os leads registrados</span>
-              </div>
-              <div class="flex-grow flex items-center justify-center min-h-[280px]">
-                <div id="chart-origin-breakdown" class="w-full max-w-[320px]"></div>
-              </div>
-            </div>
-          </div>
-
-
-        </div>
 
         <!-- 3. META CAMPAIGNS PAGE -->
         <div id="page-campaigns" class="tab-page hidden space-y-8">
