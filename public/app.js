@@ -1182,9 +1182,9 @@ function renderCampaignsTable() {
 // 5. Render Instagram Tab
 function renderInstagramTab() {
   try {
-    const profile = dashboardData.ig_profile || {};
-    const media = dashboardData.ig_media || [];
-    const ms = dashboardData.meta_daily_spend || {};
+    const profile = dashboardData.ig_stats?.profile || {};
+    const media = dashboardData.ig_stats?.media || [];
+    const ms = dashboardData.meta_stats || {};
 
     document.getElementById("ig-username").textContent = profile.username ? `@${profile.username}` : "@_";
   document.getElementById("ig-bio").textContent = profile.biography || "-";
