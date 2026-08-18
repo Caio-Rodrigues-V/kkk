@@ -161,10 +161,14 @@ def fetch_meta_form_leads(form_ids):
                         for fd in lead.get("field_data", []):
                             fname = fd.get("name", "").lower()
                             if "email" in fname:
-                                email = fd.get("values", [""])[0].lower().strip()
+                                fd_vals = fd.get("values")
+                                if fd_vals and isinstance(fd_vals, list) and len(fd_vals) > 0:
+                                    email = str(fd_vals[0]).lower().strip()
                             elif "phone" in fname or "celular" in fname or "telefone" in fname:
-                                raw_phone = fd.get("values", [""])[0]
-                                phone = "".join(filter(str.isdigit, str(raw_phone)))
+                                fd_vals = fd.get("values")
+                                if fd_vals and isinstance(fd_vals, list) and len(fd_vals) > 0:
+                                    raw_phone = str(fd_vals[0])
+                                    phone = "".join(filter(str.isdigit, raw_phone))
                                 
                         if l_id:
                             new_mappings[l_id] = {
