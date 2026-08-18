@@ -157,9 +157,14 @@ def fetch_meta_form_leads(form_ids):
                         ad_id = lead.get("ad_id")
                         
                         email = ""
+                        phone = ""
                         for fd in lead.get("field_data", []):
-                            if fd.get("name") == "email":
+                            fname = fd.get("name", "").lower()
+                            if "email" in fname:
                                 email = fd.get("values", [""])[0].lower().strip()
+                            elif "phone" in fname or "celular" in fname or "telefone" in fname:
+                                raw_phone = fd.get("values", [""])[0]
+                                phone = "".join(filter(str.isdigit, str(raw_phone)))
                                 
                         if l_id:
                             new_mappings[l_id] = {
@@ -169,6 +174,12 @@ def fetch_meta_form_leads(form_ids):
                             }
                             if email:
                                 new_mappings[email] = {
+                                    "campaign_id": c_id,
+                                    "adset_id": a_id,
+                                    "ad_id": ad_id
+                                }
+                            if phone and len(phone) >= 10:
+                                new_mappings[phone[-11:]] = {
                                     "campaign_id": c_id,
                                     "adset_id": a_id,
                                     "ad_id": ad_id
@@ -1010,26 +1021,30 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
         attributed = False
         
         c_id, a_id, ad_id = None, None, None
+        lead_meta = None
         
         # 1. Direct Email Mapping from Meta Forms
         if email:
             lead_meta = form_leads_mapping.get(email.lower().strip())
-            if lead_meta and isinstance(lead_meta, dict):
-                c_id = lead_meta.get("campaign_id")
-                a_id = lead_meta.get("adset_id")
-                ad_id = lead_meta.get("ad_id")
+            
+        # 2. Direct Phone Mapping from Meta Forms API (Bypassing Redis)
+        if not lead_meta and phone:
+            clean_phone = "".join(filter(str.isdigit, str(phone)))
+            if len(clean_phone) >= 10:
+                lead_meta = form_leads_mapping.get(clean_phone[-11:])
                 
-        # 2. Try Redis mapping fallback (Phone -> Lead ID) if no email matched
-        if not c_id and phone:
+        # 3. Try Redis mapping fallback (Phone -> Lead ID) if no direct match found
+        if not lead_meta and phone:
             clean_phone = "".join(filter(str.isdigit, str(phone)))
             if len(clean_phone) >= 10:
                 lead_id = redis_mapping.get(clean_phone[-11:])
                 if lead_id:
                     lead_meta = form_leads_mapping.get(str(lead_id))
-                    if lead_meta and isinstance(lead_meta, dict):
-                        c_id = lead_meta.get("campaign_id")
-                        a_id = lead_meta.get("adset_id")
-                        ad_id = lead_meta.get("ad_id")
+                    
+        if lead_meta and isinstance(lead_meta, dict):
+            c_id = lead_meta.get("campaign_id")
+            a_id = lead_meta.get("adset_id")
+            ad_id = lead_meta.get("ad_id")
                 
         if c_id:
             if c_id not in direct_campaigns:
