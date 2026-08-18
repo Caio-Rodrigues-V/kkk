@@ -1295,6 +1295,11 @@ function renderInstagramTab() {
   lucide.createIcons();
   } catch (error) {
     console.error("Error in renderInstagramTab:", error);
-    alert("Erro na aba Instagram: " + error.message + "\nLinha: " + error.stack);
+    const tableBody = document.getElementById("ig-media-table-body");
+    if (tableBody) {
+      tableBody.innerHTML = `<tr><td colspan="10" class="p-8 text-red-500 font-mono text-xs whitespace-pre-wrap">${error.message}\n${error.stack}</td></tr>`;
+    } else {
+      alert("Erro fatal: " + error.message);
+    }
   }
 }
