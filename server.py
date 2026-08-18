@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 import os
 import sys
 import threading
+import concurrent.futures
 
 # Ensure UTF-8 console output
 sys.stdout.reconfigure(encoding='utf-8')
@@ -610,37 +611,43 @@ def fetch_raw_live_data():
             ig_media_res = json.loads(resp.read().decode("utf-8"))
             ig_media = ig_media_res.get("data", [])
             
-        print(f"Fetched {len(ig_media)} Instagram media items. Fetching insights...")
+        print(f"Fetched {len(ig_media)} Instagram media items. Fetching insights in parallel...")
         
-        # Fetch insights for each media
-        for m in ig_media:
-            try:
-                media_type = m.get("media_type")
-                if media_type == "VIDEO":
-                    # Reels metrics, then fallback to old Video metrics
-                    metrics_sets = ["plays,reach,saved,shares,total_interactions", "impressions,reach,saved,video_views"]
-                else:
-                    # Images and Carousels
-                    metrics_sets = ["impressions,reach,saved"]
+        def fetch_insights(m):
+            media_type = m.get("media_type")
+            if media_type == "VIDEO":
+                metrics_sets = [
+                    "plays,reach,saved,shares,total_interactions", 
+                    "engagement,impressions,reach,saved,video_views"
+                ]
+            elif media_type == "CAROUSEL_ALBUM":
+                metrics_sets = [
+                    "carousel_album_engagement,carousel_album_impressions,carousel_album_reach,carousel_album_saved,carousel_album_video_views",
+                    "engagement,impressions,reach,saved"
+                ]
+            else:
+                metrics_sets = ["engagement,impressions,reach,saved"]
                 
-                success = False
-                for metrics in metrics_sets:
-                    if success: break
-                    try:
-                        url_ins = f"https://graph.facebook.com/{META_VERSION}/{m['id']}/insights?metric={metrics}&access_token={META_ACCESS_TOKEN}"
-                        req_ins = urllib.request.Request(url_ins, headers={"User-Agent": "Mozilla/5.0"})
-                        with urllib.request.urlopen(req_ins, timeout=10.0) as resp_ins:
-                            ins_data = json.loads(resp_ins.read().decode("utf-8")).get("data", [])
-                            for metric in ins_data:
-                                name = metric.get("name")
-                                values = metric.get("values", [])
-                                if values:
-                                    m[name] = values[0].get("value", 0)
-                            success = True
-                    except Exception as fallback_e:
-                        pass
-            except Exception as e:
-                pass
+            for metrics in metrics_sets:
+                try:
+                    url_ins = f"https://graph.facebook.com/{META_VERSION}/{m['id']}/insights?metric={metrics}&access_token={META_ACCESS_TOKEN}"
+                    req_ins = urllib.request.Request(url_ins, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req_ins, timeout=10.0) as resp_ins:
+                        ins_data = json.loads(resp_ins.read().decode("utf-8")).get("data", [])
+                        for metric in ins_data:
+                            name = metric.get("name")
+                            values = metric.get("values", [])
+                            if values:
+                                m[name] = values[0].get("value", 0)
+                        return # Success
+                except Exception as e:
+                    if hasattr(e, 'read'):
+                        print(f"Insights Error ({media_type}) [{metrics}]:", e.read().decode('utf-8')[:200])
+                    pass
+
+        # Parallelize insights fetching (10 threads to avoid hitting rate limits too hard)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            executor.map(fetch_insights, ig_media)
                 
         print("Fetched Instagram profile and recent media with insights.")
     except Exception as e:

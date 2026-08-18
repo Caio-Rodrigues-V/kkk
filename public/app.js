@@ -1251,16 +1251,15 @@ function renderInstagramTab() {
     const caption = m.caption ? m.caption.substring(0, 60) + "..." : "Publicação sem legenda";
     const typeLabel = m.media_type === "VIDEO" ? "Reels" : (m.media_type === "CAROUSEL_ALBUM" ? "Carrossel" : "Imagem");
     
-    // Insights metrics (defaulting to 0 or - if not fetched yet)
-    const views = m.plays || m.video_views || m.impressions || "-";
-    const reach = m.reach || "-";
-    const saved = m.saved || "-";
+    const views = m.plays || m.video_views || m.impressions || m.carousel_album_impressions || "-";
+    const reach = m.reach || m.carousel_album_reach || "-";
+    const saved = m.saved || m.carousel_album_saved || "-";
     const shares = m.shares || "-";
     
     const likes = m.like_count || 0;
     const comments = m.comments_count || 0;
     
-    const interactions = m.total_interactions || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
+    const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
     let interactionRate = "-";
     if (reach !== "-" && parseInt(reach) > 0) {
