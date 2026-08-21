@@ -1144,7 +1144,7 @@ function renderInstagramTab() {
     const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
     const row = document.createElement("div");
-    row.className = "grid grid-cols-[minmax(360px,1fr)_72px_72px_84px] max-md:grid-cols-1 gap-2 px-5 py-3 hover:bg-slate-50/70 transition-colors";
+    row.className = "grid grid-cols-[520px_72px_72px_84px] max-md:grid-cols-1 justify-start gap-3 px-5 py-2.5 hover:bg-slate-50/70 transition-colors";
     row.innerHTML = `
       <a href="${m.permalink}" target="_blank" class="flex min-w-0 items-center gap-3 group">
         <div class="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
@@ -1152,7 +1152,7 @@ function renderInstagramTab() {
           ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-1 max-w-[560px]">${caption}</p>
+          <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-1 max-w-[420px]">${caption}</p>
           <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
         </div>
       </a>
