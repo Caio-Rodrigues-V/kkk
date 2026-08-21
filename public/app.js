@@ -1144,9 +1144,9 @@ function renderInstagramTab() {
     const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
     const row = document.createElement("div");
-    row.className = "grid grid-cols-[520px_72px_72px_84px] max-md:grid-cols-1 justify-start gap-3 px-5 py-2.5 hover:bg-slate-50/70 transition-colors";
+    row.className = "flex items-center gap-6 px-5 py-2.5 hover:bg-slate-50/70 transition-colors max-md:flex-col max-md:items-stretch max-md:gap-2";
     row.innerHTML = `
-      <a href="${m.permalink}" target="_blank" class="flex min-w-0 items-center gap-3 group">
+      <a href="${m.permalink}" target="_blank" class="flex w-[520px] min-w-0 items-center gap-3 group max-md:w-full">
         <div class="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
           <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
           ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
@@ -1156,16 +1156,16 @@ function renderInstagramTab() {
           <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
         </div>
       </a>
-      <div class="grid grid-cols-3 gap-2 pl-14 md:contents md:gap-0 md:pl-0">
-        <div class="text-right max-md:text-left">
+      <div class="flex items-center gap-6 max-md:grid max-md:grid-cols-3 max-md:gap-2 max-md:pl-14">
+        <div class="w-16 text-right max-md:w-auto max-md:text-left">
           <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Interações</span>
           <span class="text-sm font-extrabold text-blue-600">${formatInteger(interactions)}</span>
         </div>
-        <div class="text-right max-md:text-left">
+        <div class="w-14 text-right max-md:w-auto max-md:text-left">
           <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Curtidas</span>
           <span class="text-sm font-bold text-slate-700">${formatInteger(likes)}</span>
         </div>
-        <div class="text-right max-md:text-left">
+        <div class="w-20 text-right max-md:w-auto max-md:text-left">
           <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Comentários</span>
           <span class="text-sm font-bold text-slate-700">${formatInteger(comments)}</span>
         </div>
