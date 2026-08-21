@@ -1156,14 +1156,9 @@ function renderInstagramTab() {
         </a>
       </td>
       <td class="px-6 py-4 font-medium text-slate-600">${typeLabel}</td>
-      <td class="px-6 py-4 text-right font-semibold">${views !== "-" ? formatInteger(views) : "-"}</td>
-      <td class="px-6 py-4 text-right font-semibold text-blue-600">${reach !== "-" ? formatInteger(reach) : "-"}</td>
-      <td class="px-6 py-4 text-right font-semibold">${formatInteger(interactions)}</td>
-      <td class="px-6 py-4 text-right font-semibold text-emerald-600">${interactionRate}</td>
+      <td class="px-6 py-4 text-right font-semibold text-blue-600">${formatInteger(interactions)}</td>
       <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(likes)}</td>
       <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(comments)}</td>
-      <td class="px-6 py-4 text-right font-semibold text-slate-700">${saved !== "-" ? formatInteger(saved) : "-"}</td>
-      <td class="px-6 py-4 text-right font-semibold text-slate-700">${shares !== "-" ? formatInteger(shares) : "-"}</td>
     `;
     tableBody.appendChild(tr);
   });
@@ -1173,7 +1168,7 @@ function renderInstagramTab() {
     console.error("Error in renderInstagramTab:", error);
     const tableBody = document.getElementById("ig-media-table-body");
     if (tableBody) {
-      tableBody.innerHTML = `<tr><td colspan="10" class="p-8 text-red-500 font-mono text-xs whitespace-pre-wrap">${error.message}\n${error.stack}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-red-500 font-mono text-xs whitespace-pre-wrap">${error.message}\n${error.stack}</td></tr>`;
     } else {
       alert("Erro fatal: " + error.message);
     }
