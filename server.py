@@ -45,7 +45,7 @@ is_fetching = False
 
 # Redis mapping functions
 def fetch_redis_mapping():
-    redis_url = os.environ.get("REDIS_URL") or os.environ.get("REDIS_PUBLIC_URL") or "redis://default:mjTjWqoAftmUpGClcZLBngHtraYbKgMP@tokaido.proxy.rlwy.net:58975"
+    redis_url = os.environ.get("REDIS_URL") or os.environ.get("REDIS_PUBLIC_URL")
     redis_host = os.environ.get("REDISHOST")
     redis_port = int(os.environ.get("REDISPORT", 6379))
     redis_password = os.environ.get("REDISPASSWORD") or os.environ.get("REDIS_PASSWORD")
@@ -219,6 +219,9 @@ CUSTOM_META_CACHE_EXPIRY = timedelta(minutes=15)
 
 def fetch_meta_campaigns_metadata():
     campaigns_meta = {}
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print("Skipping Meta Campaigns metadata fetch: META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return campaigns_meta
     try:
         url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/campaigns?fields=name,status,effective_status,objective&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -232,6 +235,9 @@ def fetch_meta_campaigns_metadata():
 
 def fetch_meta_adsets_metadata():
     adsets_meta = {}
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print("Skipping Meta Adsets metadata fetch: META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return adsets_meta
     try:
         url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/adsets?fields=name,status,effective_status,campaign_id&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -245,8 +251,11 @@ def fetch_meta_adsets_metadata():
 
 def fetch_meta_ads_metadata():
     ads_meta = {}
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print("Skipping Meta Ads metadata fetch: META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return ads_meta
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id&limit=5000&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
@@ -307,6 +316,9 @@ def get_custom_meta_campaigns(start_date, end_date):
 
 def fetch_meta_campaigns(preset, campaigns_meta):
     meta_campaigns = []
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print(f"Skipping Meta Ads data fetch for preset '{preset}': META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return meta_campaigns
     try:
         url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=campaign&fields=campaign_name,campaign_id,spend,impressions,clicks,actions,cpc,ctr&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
@@ -344,6 +356,9 @@ def fetch_meta_campaigns(preset, campaigns_meta):
 
 def fetch_meta_adsets(preset, adsets_meta):
     adsets = []
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print(f"Skipping Meta Ads adsets fetch for preset '{preset}': META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return adsets
     try:
         url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=adset&fields=adset_id,spend,impressions,clicks,actions&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
@@ -381,6 +396,9 @@ def fetch_meta_adsets(preset, adsets_meta):
 
 def fetch_meta_ads(preset, ads_meta):
     ads = []
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print(f"Skipping Meta Ads ads fetch for preset '{preset}': META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return ads
     try:
         url_i = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=ad&fields=ad_id,spend,impressions,clicks,actions&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_i = urllib.request.Request(url_i, headers={"User-Agent": "Mozilla/5.0"})
@@ -520,9 +538,13 @@ def get_custom_meta_ads(start_date, end_date):
         CUSTOM_META_ADS_CACHE[key] = (now, ads)
     except Exception as e:
         print(f"Error fetching Meta Ads ads for custom range {start_date} to {end_date}:", e)
+    return ads
 
 def fetch_meta_daily_spend(preset):
     daily_spend = []
+    if not META_ACCESS_TOKEN or not META_AD_ACCOUNT:
+        print(f"Skipping daily spend fetch for preset '{preset}': META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
+        return daily_spend
     try:
         url_ds = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/insights?level=account&fields=date_start,spend&time_increment=1&date_preset={preset}&limit=500&access_token={META_ACCESS_TOKEN}"
         req_ds = urllib.request.Request(url_ds, headers={"User-Agent": "Mozilla/5.0"})
@@ -571,23 +593,26 @@ def fetch_raw_live_data():
     
     # 1. Fetch Dinx leads (all 16,000+ items)
     dinx_requests = []
-    try:
-        req = urllib.request.Request(
-            DINX_LIST_URL,
-            data=json.dumps({}).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "x-api-key": DINX_API_KEY,
-                "User-Agent": "Mozilla/5.0"
-            },
-            method="POST"
-        )
-        with urllib.request.urlopen(req, timeout=15.0) as resp:
-            dinx_res = json.loads(resp.read().decode("utf-8"))
-            dinx_requests = dinx_res.get("requests", [])
-            print(f"Fetched {len(dinx_requests)} leads from Dinx API.")
-    except Exception as e:
-        print("Error fetching Dinx data:", e)
+    if not DINX_API_KEY:
+        print("Skipping Dinx data fetch: DINX_API_KEY is not configured.")
+    else:
+        try:
+            req = urllib.request.Request(
+                DINX_LIST_URL,
+                data=json.dumps({}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "x-api-key": DINX_API_KEY,
+                    "User-Agent": "Mozilla/5.0"
+                },
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=15.0) as resp:
+                dinx_res = json.loads(resp.read().decode("utf-8"))
+                dinx_requests = dinx_res.get("requests", [])
+                print(f"Fetched {len(dinx_requests)} leads from Dinx API.")
+        except Exception as e:
+            print("Error fetching Dinx data:", e)
         
     # 2. Fetch Meta Ads Campaigns, Adsets, and Ads for different presets
     meta_campaigns_by_preset = {}
@@ -638,61 +663,64 @@ def fetch_raw_live_data():
     # 3. Fetch Instagram profile & media
     ig_profile = {}
     ig_media = []
-    try:
-        # Profile
-        url_p = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}?fields=username,name,profile_picture_url,followers_count,media_count,biography,website&access_token={META_ACCESS_TOKEN}"
-        req_p = urllib.request.Request(url_p, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_p, timeout=15.0) as resp:
-            ig_profile = json.loads(resp.read().decode("utf-8"))
-            
-        # Media posts
-        url_m = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,thumbnail_url&limit=50&access_token={META_ACCESS_TOKEN}"
-        req_m = urllib.request.Request(url_m, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req_m, timeout=15.0) as resp:
-            ig_media_res = json.loads(resp.read().decode("utf-8"))
-            ig_media = ig_media_res.get("data", [])
-            
-        print(f"Fetched {len(ig_media)} Instagram media items. Fetching insights in parallel...")
-        
-        def fetch_insights(m):
-            media_type = m.get("media_type")
-            if media_type == "VIDEO":
-                metrics_sets = [
-                    "plays,reach,saved,shares,total_interactions", 
-                    "engagement,impressions,reach,saved,video_views"
-                ]
-            elif media_type == "CAROUSEL_ALBUM":
-                metrics_sets = [
-                    "carousel_album_engagement,carousel_album_impressions,carousel_album_reach,carousel_album_saved,carousel_album_video_views",
-                    "engagement,impressions,reach,saved"
-                ]
-            else:
-                metrics_sets = ["engagement,impressions,reach,saved"]
-                
-            for metrics in metrics_sets:
-                try:
-                    url_ins = f"https://graph.facebook.com/{META_VERSION}/{m['id']}/insights?metric={metrics}&access_token={META_ACCESS_TOKEN}"
-                    req_ins = urllib.request.Request(url_ins, headers={"User-Agent": "Mozilla/5.0"})
-                    with urllib.request.urlopen(req_ins, timeout=10.0) as resp_ins:
-                        ins_data = json.loads(resp_ins.read().decode("utf-8")).get("data", [])
-                        for metric in ins_data:
-                            name = metric.get("name")
-                            values = metric.get("values", [])
-                            if values:
-                                m[name] = values[0].get("value", 0)
-                        return # Success
-                except Exception as e:
-                    if hasattr(e, 'read'):
-                        print(f"Insights Error ({media_type}) [{metrics}]:", e.read().decode('utf-8')[:200])
-                    pass
+    if not META_ACCESS_TOKEN or not META_IG_ACCOUNT:
+        print("Skipping Instagram data fetch: META_ACCESS_TOKEN or META_IG_ACCOUNT is not configured.")
+    else:
+        try:
+            # Profile
+            url_p = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}?fields=username,name,profile_picture_url,followers_count,media_count,biography,website&access_token={META_ACCESS_TOKEN}"
+            req_p = urllib.request.Request(url_p, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req_p, timeout=15.0) as resp:
+                ig_profile = json.loads(resp.read().decode("utf-8"))
 
-        # Parallelize insights fetching (10 threads to avoid hitting rate limits too hard)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            executor.map(fetch_insights, ig_media)
-                
-        print("Fetched Instagram profile and recent media with insights.")
-    except Exception as e:
-        print("Error fetching Instagram data:", e)
+            # Media posts
+            url_m = f"https://graph.facebook.com/{META_VERSION}/{META_IG_ACCOUNT}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,thumbnail_url&limit=50&access_token={META_ACCESS_TOKEN}"
+            req_m = urllib.request.Request(url_m, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req_m, timeout=15.0) as resp:
+                ig_media_res = json.loads(resp.read().decode("utf-8"))
+                ig_media = ig_media_res.get("data", [])
+
+            print(f"Fetched {len(ig_media)} Instagram media items. Fetching insights in parallel...")
+
+            def fetch_insights(m):
+                media_type = m.get("media_type")
+                if media_type == "VIDEO":
+                    metrics_sets = [
+                        "plays,reach,saved,shares,total_interactions",
+                        "engagement,impressions,reach,saved,video_views"
+                    ]
+                elif media_type == "CAROUSEL_ALBUM":
+                    metrics_sets = [
+                        "carousel_album_engagement,carousel_album_impressions,carousel_album_reach,carousel_album_saved,carousel_album_video_views",
+                        "engagement,impressions,reach,saved"
+                    ]
+                else:
+                    metrics_sets = ["engagement,impressions,reach,saved"]
+
+                for metrics in metrics_sets:
+                    try:
+                        url_ins = f"https://graph.facebook.com/{META_VERSION}/{m['id']}/insights?metric={metrics}&access_token={META_ACCESS_TOKEN}"
+                        req_ins = urllib.request.Request(url_ins, headers={"User-Agent": "Mozilla/5.0"})
+                        with urllib.request.urlopen(req_ins, timeout=10.0) as resp_ins:
+                            ins_data = json.loads(resp_ins.read().decode("utf-8")).get("data", [])
+                            for metric in ins_data:
+                                name = metric.get("name")
+                                values = metric.get("values", [])
+                                if values:
+                                    m[name] = values[0].get("value", 0)
+                            return # Success
+                    except Exception as e:
+                        if hasattr(e, 'read'):
+                            print(f"Insights Error ({media_type}) [{metrics}]:", e.read().decode('utf-8')[:200])
+                        pass
+
+            # Parallelize insights fetching (10 threads to avoid hitting rate limits too hard)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                executor.map(fetch_insights, ig_media)
+
+            print("Fetched Instagram profile and recent media with insights.")
+        except Exception as e:
+            print("Error fetching Instagram data:", e)
         
     # 4. Fetch Meta Form Leads based on discovered form IDs
     redis_mapping = fetch_redis_mapping()
@@ -1211,6 +1239,131 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     
     return aggregated_data
 
+def build_debug_data(exclude_internal=False, date_range="all", start_date=None, end_date=None):
+    raw_data = load_raw_cache() or {}
+    processed = get_processed_data(
+        exclude_internal=exclude_internal,
+        date_range=date_range,
+        start_date=start_date,
+        end_date=end_date
+    )
+
+    dinx_requests = raw_data.get("dinx_requests", [])
+    meta_campaigns = processed.get("meta_stats", {}).get("campaigns", [])
+    meta_adsets = processed.get("meta_stats", {}).get("adsets", [])
+    meta_ads = processed.get("meta_stats", {}).get("ads", [])
+    redis_mapping = raw_data.get("redis_mapping", {})
+    form_leads_mapping = raw_data.get("form_leads_mapping", {})
+
+    origin_counts = {}
+    status_counts = {}
+    school_counts = {}
+    leads_with_email = 0
+    leads_with_phone = 0
+    leads_with_landing_url = 0
+    leads_with_utm_campaign = 0
+
+    for lead in dinx_requests:
+        origin = str(lead.get("origin"))
+        status = str(lead.get("status"))
+        school = str(lead.get("schoolType"))
+        origin_counts[origin] = origin_counts.get(origin, 0) + 1
+        status_counts[status] = status_counts.get(status, 0) + 1
+        school_counts[school] = school_counts.get(school, 0) + 1
+
+        if lead.get("email"):
+            leads_with_email += 1
+        if lead.get("phone"):
+            leads_with_phone += 1
+        landing_url = lead.get("landingUrl") or ""
+        if landing_url:
+            leads_with_landing_url += 1
+            if "utm_campaign=" in landing_url:
+                leads_with_utm_campaign += 1
+
+    return {
+        "last_updated": raw_data.get("last_updated"),
+        "is_fetching": is_fetching,
+        "request": {
+            "exclude_internal": exclude_internal,
+            "date_range": date_range,
+            "start_date": start_date,
+            "end_date": end_date
+        },
+        "raw_counts": {
+            "dinx_requests": len(dinx_requests),
+            "redis_mapping_keys": len(redis_mapping),
+            "form_leads_mapping_keys": len(form_leads_mapping),
+            "ig_media": len(raw_data.get("ig_media", [])),
+            "meta_campaigns_by_range": {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in (raw_data.get("meta_campaigns", {}) or {}).items()
+            },
+            "meta_adsets_by_range": {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in (raw_data.get("meta_adsets", {}) or {}).items()
+            },
+            "meta_ads_by_range": {
+                key: len(value) if isinstance(value, list) else 0
+                for key, value in (raw_data.get("meta_ads", {}) or {}).items()
+            }
+        },
+        "dinx_fields": {
+            "origin_counts": origin_counts,
+            "status_counts": status_counts,
+            "school_counts": school_counts,
+            "leads_with_email": leads_with_email,
+            "leads_with_phone": leads_with_phone,
+            "leads_with_landing_url": leads_with_landing_url,
+            "leads_with_utm_campaign": leads_with_utm_campaign
+        },
+        "processed_counts": {
+            "dinx_total_leads": processed.get("dinx_stats", {}).get("total_leads", 0),
+            "dinx_qualificados": processed.get("dinx_stats", {}).get("qualificados", 0),
+            "dinx_qualificados_private": processed.get("dinx_stats", {}).get("qualificados_private", 0),
+            "dinx_ativados": processed.get("dinx_stats", {}).get("ativados", 0),
+            "meta_campaigns": len(meta_campaigns),
+            "meta_adsets": len(meta_adsets),
+            "meta_ads": len(meta_ads),
+            "meta_leads_reported": sum(item.get("leads", 0) for item in meta_campaigns),
+            "attributed_dinx_leads": sum(item.get("dinx_leads", 0) for item in meta_campaigns),
+            "attributed_dinx_approved": sum(item.get("dinx_approved", 0) for item in meta_campaigns),
+            "attributed_dinx_activated": sum(item.get("dinx_activated", 0) for item in meta_campaigns),
+            "campaigns_with_meta_leads": sum(1 for item in meta_campaigns if item.get("leads", 0) > 0),
+            "campaigns_with_attributed_approved": sum(1 for item in meta_campaigns if item.get("dinx_approved", 0) > 0)
+        },
+        "top_campaigns_by_meta_leads": sorted(
+            [
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "meta_leads": item.get("leads", 0),
+                    "dinx_leads": item.get("dinx_leads", 0),
+                    "dinx_approved": item.get("dinx_approved", 0),
+                    "spend": item.get("spend", 0)
+                }
+                for item in meta_campaigns
+            ],
+            key=lambda item: item["meta_leads"],
+            reverse=True
+        )[:10],
+        "top_campaigns_by_attributed_approved": sorted(
+            [
+                {
+                    "id": item.get("id"),
+                    "name": item.get("name"),
+                    "meta_leads": item.get("leads", 0),
+                    "dinx_leads": item.get("dinx_leads", 0),
+                    "dinx_approved": item.get("dinx_approved", 0),
+                    "spend": item.get("spend", 0)
+                }
+                for item in meta_campaigns
+            ],
+            key=lambda item: item["dinx_approved"],
+            reverse=True
+        )[:10]
+    }
+
 class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         # Serve static files from the "public" directory
@@ -1260,6 +1413,23 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
                     self.wfile.write(json.dumps(res).encode("utf-8"))
             except Exception as e:
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+        elif parsed_url.path == "/api/debug-data":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            try:
+                data = build_debug_data(
+                    exclude_internal=exclude_internal,
+                    date_range=date_range,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                self.wfile.write(json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+            except Exception as e:
+                import traceback
+                error_payload = {"error": str(e), "traceback": traceback.format_exc()}
+                self.wfile.write(json.dumps(error_payload, ensure_ascii=False).encode("utf-8"))
         elif parsed_url.path == "/api/sync":
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

@@ -50,7 +50,7 @@ const btnToggleSidebarEl = document.getElementById("btn-toggle-sidebar");
 // Initialize Navigation & Event Listeners
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize Lucide Icons
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
   
   // Tab Routing
   menuItems.forEach(item => {
@@ -467,6 +467,10 @@ function renderOverviewTab() {
 function renderCPARadialBar(percentValue) {
   const container = document.getElementById("cpa-radial-chart");
   container.innerHTML = ""; // Clear
+  if (!window.ApexCharts) {
+    container.textContent = `${percentValue.toFixed(2)}%`;
+    return;
+  }
   
   const options = {
     series: [percentValue],
@@ -511,6 +515,7 @@ function renderCPARadialBar(percentValue) {
 function renderOverviewTrendChart(trendData) {
   const container = document.getElementById("overview-trend-chart");
   container.innerHTML = ""; // Clear
+  if (!window.ApexCharts) return;
 
   const slicedData = trendData.slice(-30);
   const categories = slicedData.map(item => {
@@ -584,6 +589,7 @@ function renderOverviewSpendChart(trendData) {
   const container = document.getElementById("overview-spend-chart");
   if (!container) return;
   container.innerHTML = ""; // Clear
+  if (!window.ApexCharts) return;
 
   const slicedData = trendData.slice(-30);
   const categories = slicedData.map(item => {
@@ -646,6 +652,7 @@ function renderOverviewCPLChart(trendData) {
   const container = document.getElementById("overview-cpl-chart");
   if (!container) return;
   container.innerHTML = ""; // Clear
+  if (!window.ApexCharts) return;
 
   const slicedData = trendData.slice(-30);
   const categories = slicedData.map(item => {
@@ -804,9 +811,9 @@ function renderCampaignsTable() {
   // Calculate global summary stats for the Campaigns page big numbers
   const totalSpend = campaigns.reduce((acc, c) => acc + (c.spend || 0.0), 0.0);
   const totalLeads = campaigns.reduce((acc, c) => acc + (c.leads || 0), 0);
-  const totalQual = ds.qualificados_private || 0;
-  const totalActiv = ds.ativados || 0;
-  const taxaQual = ds.total_leads > 0 ? (ds.qualificados_private / ds.total_leads) : 0;
+  const totalQual = campaigns.reduce((acc, c) => acc + (c.dinx_approved || 0), 0);
+  const totalActiv = campaigns.reduce((acc, c) => acc + (c.dinx_activated || 0), 0);
+  const taxaQual = totalLeads > 0 ? (totalQual / totalLeads) : 0;
 
   // Render big numbers
   document.getElementById("meta-kpi-investido").textContent = formatCurrency(totalSpend);
@@ -1028,7 +1035,7 @@ function renderCampaignsTable() {
   });
 
   // Re-run lucide icons to build the fallback image icon if needed
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 
   // Render pagination controls
   const paginationContainer = document.getElementById("table-pagination");
@@ -1163,7 +1170,7 @@ function renderInstagramTab() {
     tableBody.appendChild(tr);
   });
   
-  lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
   } catch (error) {
     console.error("Error in renderInstagramTab:", error);
     const tableBody = document.getElementById("ig-media-table-body");
