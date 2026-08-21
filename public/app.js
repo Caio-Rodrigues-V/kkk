@@ -1143,35 +1143,37 @@ function renderInstagramTab() {
     
     const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
-    const row = document.createElement("div");
-    row.className = "grid grid-cols-[minmax(0,1fr)_120px_120px_120px] items-center gap-4 px-5 py-2.5 hover:bg-slate-50/70 transition-colors max-md:grid-cols-1 max-md:items-stretch max-md:gap-2";
-    row.innerHTML = `
-      <a href="${m.permalink}" target="_blank" class="flex min-w-0 items-center gap-3 group">
-        <div class="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
+    const card = document.createElement("a");
+    card.href = m.permalink;
+    card.target = "_blank";
+    card.className = "group bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:bg-slate-50/70 transition-colors";
+    card.innerHTML = `
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="w-12 h-12 rounded-xl overflow-hidden bg-slate-100 flex-shrink-0 relative">
           <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
           ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
         </div>
         <div class="min-w-0">
-          <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-1">${caption}</p>
+          <p class="text-xs font-bold text-slate-800 whitespace-normal line-clamp-2">${caption}</p>
           <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
         </div>
-      </a>
-      <div class="grid grid-cols-3 gap-2 pl-14 md:contents md:pl-0">
-        <div class="text-right max-md:text-left">
-          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Interações</span>
+      </div>
+      <div class="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-slate-100">
+        <div>
+          <span class="block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Interações</span>
           <span class="text-sm font-extrabold text-blue-600">${formatInteger(interactions)}</span>
         </div>
-        <div class="text-right max-md:text-left">
-          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Curtidas</span>
+        <div>
+          <span class="block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Curtidas</span>
           <span class="text-sm font-bold text-slate-700">${formatInteger(likes)}</span>
         </div>
-        <div class="text-right max-md:text-left">
-          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Comentários</span>
+        <div>
+          <span class="block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Comentários</span>
           <span class="text-sm font-bold text-slate-700">${formatInteger(comments)}</span>
         </div>
       </div>
     `;
-    tableBody.appendChild(row);
+    tableBody.appendChild(card);
   });
   
   if (window.lucide) lucide.createIcons();
