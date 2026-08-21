@@ -1088,7 +1088,7 @@ function renderInstagramTab() {
   tableBody.innerHTML = "";
 
   if (media.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="10" class="text-center py-10 text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</td></tr>`;
     const bestPostContainer = document.getElementById("ig-best-post-container");
     if(bestPostContainer) bestPostContainer.classList.add("hidden");
     return;
@@ -1135,8 +1135,6 @@ function renderInstagramTab() {
     const caption = m.caption ? m.caption.substring(0, 60) + "..." : "Publicação sem legenda";
     const typeLabel = m.media_type === "VIDEO" ? "Reels" : (m.media_type === "CAROUSEL_ALBUM" ? "Carrossel" : "Imagem");
     
-    const views = m.plays || m.video_views || m.impressions || m.carousel_album_impressions || "-";
-    const reach = m.reach || m.carousel_album_reach || "-";
     const saved = m.saved || m.carousel_album_saved || "-";
     const shares = m.shares || "-";
     
@@ -1145,11 +1143,6 @@ function renderInstagramTab() {
     
     const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
-    let interactionRate = "-";
-    if (reach !== "-" && parseInt(reach) > 0) {
-      interactionRate = formatPercentage(interactions / parseInt(reach));
-    }
-
     const tr = document.createElement("tr");
     tr.className = "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0";
     tr.innerHTML = `
@@ -1159,10 +1152,12 @@ function renderInstagramTab() {
             <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
             ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
           </div>
-          <p class="text-xs font-semibold text-slate-700 w-48 whitespace-normal line-clamp-2">${caption}</p>
+          <div class="min-w-0">
+            <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-2">${caption}</p>
+            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
+          </div>
         </a>
       </td>
-      <td class="px-6 py-4 font-medium text-slate-600">${typeLabel}</td>
       <td class="px-6 py-4 text-right font-semibold text-blue-600">${formatInteger(interactions)}</td>
       <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(likes)}</td>
       <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(comments)}</td>
