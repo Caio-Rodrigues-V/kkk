@@ -291,7 +291,7 @@ def fetch_meta_ads_metadata():
         print("Skipping Meta Ads metadata fetch: META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
         return ads_meta
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{thumbnail_url,object_story_spec,asset_feed_spec}}&limit=5000&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
