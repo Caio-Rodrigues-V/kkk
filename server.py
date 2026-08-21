@@ -116,17 +116,27 @@ def fetch_meta_leads_by_ids(lead_ids):
                     ad_id = lead.get("ad_id")
                     
                     email = ""
+                    phone = ""
                     for fd in lead.get("field_data", []):
-                        if fd.get("name") == "email":
-                            email = fd.get("values", [""])[0].lower().strip()
+                        fname = fd.get("name", "").lower()
+                        fd_vals = fd.get("values")
+                        if not fd_vals or not isinstance(fd_vals, list):
+                            continue
+                        if "email" in fname:
+                            email = str(fd_vals[0]).lower().strip()
+                        elif "phone" in fname or "celular" in fname or "telefone" in fname or "whatsapp" in fname or "wpp" in fname:
+                            phone = "".join(filter(str.isdigit, str(fd_vals[0])))
                             
                     mappings[str(l_id)] = {
                         "campaign_id": c_id,
                         "adset_id": a_id,
-                        "ad_id": ad_id
+                        "ad_id": ad_id,
+                        "source": "meta_lead_id"
                     }
                     if email:
                         mappings[email] = mappings[str(l_id)]
+                    if phone and len(phone) >= 10:
+                        mappings[phone[-11:]] = mappings[str(l_id)]
     except Exception as e:
         print("Error fetching meta leads by ids:", e)
     return mappings
@@ -174,19 +184,25 @@ def fetch_meta_form_leads(form_ids):
                             new_mappings[l_id] = {
                                 "campaign_id": c_id,
                                 "adset_id": a_id,
-                                "ad_id": ad_id
+                                "ad_id": ad_id,
+                                "form_id": form_id,
+                                "source": "meta_form_lead"
                             }
                             if email:
                                 new_mappings[email] = {
                                     "campaign_id": c_id,
                                     "adset_id": a_id,
-                                    "ad_id": ad_id
+                                    "ad_id": ad_id,
+                                    "form_id": form_id,
+                                    "source": "meta_form_lead"
                                 }
                             if phone and len(phone) >= 10:
                                 new_mappings[phone[-11:]] = {
                                     "campaign_id": c_id,
                                     "adset_id": a_id,
-                                    "ad_id": ad_id
+                                    "ad_id": ad_id,
+                                    "form_id": form_id,
+                                    "source": "meta_form_lead"
                                 }
                             if l_id in GLOBAL_FORM_LEADS_CACHE:
                                 has_overlap = True
@@ -203,6 +219,26 @@ def fetch_meta_form_leads(form_ids):
     GLOBAL_FORM_LEADS_CACHE.update(new_mappings)
     print(f"Form leads cache size: {len(GLOBAL_FORM_LEADS_CACHE)} (added {len(new_mappings)} in this sync).")
     return GLOBAL_FORM_LEADS_CACHE.copy()
+
+def extract_lead_form_ids(value):
+    form_ids = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            key_lower = str(key).lower()
+            if key_lower in ("lead_gen_form_id", "leadgen_form_id", "lead_form_id") and item:
+                form_ids.add(str(item))
+            else:
+                form_ids.update(extract_lead_form_ids(item))
+    elif isinstance(value, list):
+        for item in value:
+            form_ids.update(extract_lead_form_ids(item))
+    return form_ids
+
+def discover_meta_lead_form_ids(ads_meta):
+    form_ids = set()
+    for ad in ads_meta.values():
+        form_ids.update(extract_lead_form_ids(ad))
+    return form_ids
 
 def get_campaign_for_lead(lead_id, form_leads_mapping):
     if lead_id in form_leads_mapping:
@@ -255,7 +291,7 @@ def fetch_meta_ads_metadata():
         print("Skipping Meta Ads metadata fetch: META_ACCESS_TOKEN or META_AD_ACCOUNT is not configured.")
         return ads_meta
     try:
-        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{thumbnail_url}}&limit=5000&access_token={META_ACCESS_TOKEN}"
+        url = f"https://graph.facebook.com/{META_VERSION}/{META_AD_ACCOUNT}/ads?fields=name,status,effective_status,campaign_id,adset_id,creative{{thumbnail_url,object_story_spec,asset_feed_spec}}&limit=5000&access_token={META_ACCESS_TOKEN}"
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=15.0) as resp:
             res = json.loads(resp.read().decode("utf-8"))
@@ -625,15 +661,17 @@ def fetch_raw_live_data():
     adsets_meta = fetch_meta_adsets_metadata()
     ads_meta = fetch_meta_ads_metadata()
     
-    # Form IDs to track (We will add the old ones here later)
-    form_ids = [
+    # Known historical forms plus any forms discovered in current ad creatives.
+    known_form_ids = [
         "2230521901040318", # Form V5 (Ativo)
         "1047323807697738", # Desativado
         "2184251165469840", # Desativado
         "1594114028736919", # Desativado
         "803818399423508"   # Desativado
     ]
-    print(f"Tracking lead generation forms: {form_ids}")
+    discovered_form_ids = discover_meta_lead_form_ids(ads_meta)
+    form_ids = sorted(set(known_form_ids).union(discovered_form_ids))
+    print(f"Tracking lead generation forms: {form_ids} ({len(discovered_form_ids)} discovered from ads).")
     
     presets_map = {
         "all": "maximum",
@@ -746,6 +784,8 @@ def fetch_raw_live_data():
         "ig_profile": ig_profile,
         "ig_media": ig_media,
         "redis_mapping": redis_mapping,
+        "meta_form_ids": form_ids,
+        "meta_discovered_form_ids": sorted(discovered_form_ids),
         "form_leads_mapping": form_leads_mapping
     }
 
@@ -1014,9 +1054,7 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                 "cpl": day_cpl
             })
         
-    # 5. Campaign Attribution Logic (Dinx Backoffice to Meta Campaigns)
-    from urllib.parse import urlparse, parse_qs
-    
+    # 5. Campaign Attribution Logic (Dinx Backoffice to Meta lead forms)
     # Load Redis mapping (email/phone -> lead_id) from raw_data cache
     redis_mapping = raw_data.get("redis_mapping", {})
     
@@ -1050,8 +1088,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
         if not (in_creation_range or in_activation_range):
             continue
             
-        attributed = False
-        
         c_id, a_id, ad_id = None, None, None
         lead_meta = None
         
@@ -1087,7 +1123,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                     direct_campaigns[c_id]["approved"] += 1
             if is_ativado and in_activation_range:
                 direct_campaigns[c_id]["activated"] += 1
-            attributed = True
             
         if a_id:
             if a_id not in direct_adsets:
@@ -1108,27 +1143,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
                     direct_ads[ad_id]["approved"] += 1
             if is_ativado and in_activation_range:
                 direct_ads[ad_id]["activated"] += 1
-                
-        # 2. Fallback to direct UTM campaign mapping
-        if not attributed:
-            l_url = r.get("landingUrl")
-            if l_url and in_creation_range:
-                try:
-                    parsed = urlparse(l_url)
-                    qs = parse_qs(parsed.query)
-                    if "utm_campaign" in qs:
-                        camp_id = qs["utm_campaign"][0]
-                        if camp_id:
-                            if camp_id not in direct_campaigns:
-                                direct_campaigns[camp_id] = {"leads": 0, "approved": 0, "activated": 0}
-                            direct_campaigns[camp_id]["leads"] += 1
-                            if is_qualificado:
-                                direct_campaigns[camp_id]["approved"] += 1
-                            if is_ativado and in_activation_range:
-                                direct_campaigns[camp_id]["activated"] += 1
-                            attributed = True
-                except:
-                    pass
                 
     # Load Meta Campaigns for the requested date_range
     meta_campaigns_raw = []
@@ -1262,6 +1276,7 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
     leads_with_phone = 0
     leads_with_landing_url = 0
     leads_with_utm_campaign = 0
+    active_private_leads = 0
 
     for lead in dinx_requests:
         origin = str(lead.get("origin"))
@@ -1275,6 +1290,11 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
             leads_with_email += 1
         if lead.get("phone"):
             leads_with_phone += 1
+        if (
+            lead.get("status") == "SITE_BETA_ACCESS_INVITE_STATUS_USER_CREATED"
+            and lead.get("schoolType") == "SITE_BETA_ACCESS_SCHOOL_TYPE_PRIVATE"
+        ):
+            active_private_leads += 1
         landing_url = lead.get("landingUrl") or ""
         if landing_url:
             leads_with_landing_url += 1
@@ -1294,6 +1314,8 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
             "dinx_requests": len(dinx_requests),
             "redis_mapping_keys": len(redis_mapping),
             "form_leads_mapping_keys": len(form_leads_mapping),
+            "meta_form_ids": len(raw_data.get("meta_form_ids", [])),
+            "meta_discovered_form_ids": len(raw_data.get("meta_discovered_form_ids", [])),
             "ig_media": len(raw_data.get("ig_media", [])),
             "meta_campaigns_by_range": {
                 key: len(value) if isinstance(value, list) else 0
@@ -1314,9 +1336,12 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
             "school_counts": school_counts,
             "leads_with_email": leads_with_email,
             "leads_with_phone": leads_with_phone,
+            "active_private_leads": active_private_leads,
             "leads_with_landing_url": leads_with_landing_url,
             "leads_with_utm_campaign": leads_with_utm_campaign
         },
+        "meta_form_ids": raw_data.get("meta_form_ids", []),
+        "meta_discovered_form_ids": raw_data.get("meta_discovered_form_ids", []),
         "processed_counts": {
             "dinx_total_leads": processed.get("dinx_stats", {}).get("total_leads", 0),
             "dinx_qualificados": processed.get("dinx_stats", {}).get("qualificados", 0),
