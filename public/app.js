@@ -806,75 +806,14 @@ function renderCampaignsTable() {
   const adsets = ms.adsets || [];
   const ads = ms.ads || [];
 
-  const ds = dashboardData.dinx_stats;
-
   // Calculate global summary stats for the Campaigns page big numbers
   const totalSpend = campaigns.reduce((acc, c) => acc + (c.spend || 0.0), 0.0);
   const totalLeads = campaigns.reduce((acc, c) => acc + (c.leads || 0), 0);
-  const totalQual = campaigns.reduce((acc, c) => acc + (c.dinx_approved || 0), 0);
-  const totalActiv = campaigns.reduce((acc, c) => acc + (c.dinx_activated || 0), 0);
-  const taxaQual = totalLeads > 0 ? (totalQual / totalLeads) : 0;
 
   // Render big numbers
   document.getElementById("meta-kpi-investido").textContent = formatCurrency(totalSpend);
   document.getElementById("meta-kpi-investido-sub").textContent = `${formatInteger(totalLeads)} resultados na Meta`;
   document.getElementById("meta-kpi-leads").textContent = formatInteger(totalLeads);
-  document.getElementById("meta-kpi-qualificados").textContent = formatInteger(totalQual);
-  document.getElementById("meta-kpi-ativados").textContent = formatInteger(totalActiv);
-  document.getElementById("meta-kpi-taxa-qualif").textContent = formatPercentage(taxaQual);
-
-  // Active vs Paused counts
-  const activeCampaigns = campaigns.filter(c => (c.status || "").toUpperCase() === "ACTIVE").length;
-  const pausedCampaigns = campaigns.length - activeCampaigns;
-  document.getElementById("label-campaign-status").textContent = `Campanha Destaque (${activeCampaigns} ativas / ${pausedCampaigns} pausadas)`;
-
-  const activeAds = ads.filter(ad => (ad.status || "").toUpperCase() === "ACTIVE").length;
-  const pausedAds = ads.length - activeAds;
-  document.getElementById("label-ad-status").textContent = `Criativo Destaque (${activeAds} ativos / ${pausedAds} pausados)`;
-
-  // Find Highlight Campaign (Award Campaign with highest qualified leads)
-  let topCampaign = null;
-  campaigns.forEach(c => {
-    if (!topCampaign || (c.dinx_approved || 0) > (topCampaign.dinx_approved || 0)) {
-      topCampaign = c;
-    }
-  });
-
-  if (topCampaign && (topCampaign.dinx_approved || 0) > 0) {
-    document.getElementById("highlight-campaign-name").textContent = topCampaign.name;
-    document.getElementById("highlight-campaign-value").textContent = `${formatInteger(topCampaign.dinx_approved)} qualif.`;
-    document.getElementById("highlight-campaign-sub").textContent = `${formatCurrency(topCampaign.spend)} investido`;
-  } else {
-    document.getElementById("highlight-campaign-name").textContent = "Nenhuma campanha atribuída";
-    document.getElementById("highlight-campaign-value").textContent = "0 qualif.";
-    document.getElementById("highlight-campaign-sub").textContent = "R$ 0,00 investido";
-  }
-
-  // Find Highlight Ad (Creative with highest qualified leads)
-  let topAd = null;
-  ads.forEach(ad => {
-    if (!topAd || (ad.dinx_approved || 0) > (topAd.dinx_approved || 0)) {
-      topAd = ad;
-    }
-  });
-
-  const adImgContainer = document.getElementById("highlight-ad-image-container");
-  if (topAd && (topAd.dinx_approved || 0) > 0) {
-    document.getElementById("highlight-ad-name").textContent = topAd.name;
-    document.getElementById("highlight-ad-value").textContent = `${formatInteger(topAd.dinx_approved)} qualif.`;
-    document.getElementById("highlight-ad-sub").textContent = `${formatCurrency(topAd.spend)} investido`;
-    
-    if (topAd.thumbnail_url) {
-      adImgContainer.innerHTML = `<img src="${topAd.thumbnail_url}" class="w-full h-full object-cover rounded-lg">`;
-    } else {
-      adImgContainer.innerHTML = `<i data-lucide="image" class="w-5 h-5 text-slate-400"></i>`;
-    }
-  } else {
-    document.getElementById("highlight-ad-name").textContent = "Nenhum criativo atribuído";
-    document.getElementById("highlight-ad-value").textContent = "0 qualif.";
-    document.getElementById("highlight-ad-sub").textContent = "R$ 0,00 investido";
-    adImgContainer.innerHTML = `<i data-lucide="image" class="w-5 h-5 text-slate-400"></i>`;
-  }
 
   // 1. Update sub-tab badge counts
   const badgeCampaigns = document.getElementById("badge-count-campaigns");
@@ -899,10 +838,7 @@ function renderCampaignsTable() {
         <th class="px-6 py-4">Status</th>
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
-        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
-        <th class="px-6 py-4 text-right">Apps ativos</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
+        <th class="px-6 py-4 text-right">CPL Meta</th>
       </tr>
     `;
   } else if (activeSubTab === "adsets") {
@@ -913,10 +849,7 @@ function renderCampaignsTable() {
         <th class="px-6 py-4">Status</th>
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
-        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
-        <th class="px-6 py-4 text-right">Apps ativos</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
+        <th class="px-6 py-4 text-right">CPL Meta</th>
       </tr>
     `;
   } else {
@@ -927,10 +860,7 @@ function renderCampaignsTable() {
         <th class="px-6 py-4">Status</th>
         <th class="px-6 py-4 text-right">Valor investido</th>
         <th class="px-6 py-4 text-right">Cadastros totais</th>
-        <th class="px-6 py-4 text-right">Cadastros qualificados</th>
-        <th class="px-6 py-4 text-right">Apps ativos</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/Cad. Qualificado</th>
-        <th class="px-6 py-4 text-right text-orange-600">Custo/App ativo</th>
+        <th class="px-6 py-4 text-right">CPL Meta</th>
       </tr>
     `;
   }
@@ -959,7 +889,7 @@ function renderCampaignsTable() {
   const itemsName = activeSubTab === "campaigns" ? "campanhas" : (activeSubTab === "adsets" ? "conjuntos" : "anúncios");
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wide">Nenhum registro encontrado.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-10 text-slate-400 font-bold text-xs uppercase tracking-wide">Nenhum registro encontrado.</td></tr>`;
     document.getElementById("table-pagination").innerHTML = "";
     return;
   }
@@ -979,12 +909,7 @@ function renderCampaignsTable() {
     
     const spend = item.spend || 0.0;
     const leads = item.leads || 0;
-    const qualificados = item.dinx_approved || 0;
-    const ativados = item.dinx_activated || 0;
-    
     const cpl = leads > 0 ? (spend / leads) : 0;
-    const cpaQualif = qualificados > 0 ? (spend / qualificados) : 0;
-    const cpaActiv = ativados > 0 ? (spend / ativados) : 0;
 
     if (activeSubTab === "campaigns") {
       tr.innerHTML = `
@@ -992,10 +917,7 @@ function renderCampaignsTable() {
         <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${leads > 0 ? formatCurrency(cpl) : '—'}</td>
       `;
     } else if (activeSubTab === "adsets") {
       tr.innerHTML = `
@@ -1003,10 +925,7 @@ function renderCampaignsTable() {
         <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${leads > 0 ? formatCurrency(cpl) : '—'}</td>
       `;
     } else {
       const imgTag = item.thumbnail_url 
@@ -1024,10 +943,7 @@ function renderCampaignsTable() {
         <td class="px-6 py-4"><span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${statusClass}">${statusText}</span></td>
         <td class="px-6 py-4 text-right font-extrabold text-slate-800">${formatCurrency(spend)}</td>
         <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(leads)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(qualificados)}</td>
-        <td class="px-6 py-4 text-right font-bold text-orange-600">${formatInteger(ativados)}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${qualificados > 0 ? formatCurrency(cpaQualif) : '—'}</td>
-        <td class="px-6 py-4 text-right text-orange-600 font-extrabold">${ativados > 0 ? formatCurrency(cpaActiv) : '—'}</td>
+        <td class="px-6 py-4 text-right font-extrabold text-slate-800">${leads > 0 ? formatCurrency(cpl) : '—'}</td>
       `;
     }
     

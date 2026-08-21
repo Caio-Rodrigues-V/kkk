@@ -460,7 +460,7 @@
           </div>
 
           <!-- BIG NUMBERS / HIGHLIGHTS ROW -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <!-- Card 1: Investimento Meta -->
             <div class="bg-white border border-slate-100 rounded-xl p-5 relative overflow-hidden shadow-sm">
               <div class="absolute top-0 inset-x-0 h-1 bg-purple-500"></div>
@@ -487,81 +487,6 @@
               <div class="text-[10px] text-slate-400 font-semibold mt-1">Leads no Meta Ads</div>
             </div>
 
-            <!-- Card 3: Leads Qualificados (Dinx Mapped) -->
-            <div class="bg-white border border-slate-100 rounded-xl p-5 relative overflow-hidden shadow-sm">
-              <div class="absolute top-0 inset-x-0 h-1 bg-orange-500"></div>
-              <div class="flex items-center gap-2 mb-3 justify-between">
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">LEADS QUALIFICADOS</span>
-                <div class="p-1 rounded-lg bg-orange-50 text-orange-600">
-                  <i data-lucide="graduation-cap" class="w-3.5 h-3.5"></i>
-                </div>
-              </div>
-              <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="meta-kpi-qualificados">0</div>
-              <div class="text-[10px] text-slate-400 font-semibold mt-1">Com filhos e escola particular</div>
-            </div>
-
-            <!-- Card 4: Ativaram App (Dinx Mapped) -->
-            <div class="bg-white border border-slate-100 rounded-xl p-5 relative overflow-hidden shadow-sm">
-              <div class="absolute top-0 inset-x-0 h-1 bg-emerald-500"></div>
-              <div class="flex items-center gap-2 mb-3 justify-between">
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">ATIVARAM APP</span>
-                <div class="p-1 rounded-lg bg-emerald-50 text-emerald-600">
-                  <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
-                </div>
-              </div>
-              <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="meta-kpi-ativados">0</div>
-              <div class="text-[10px] text-slate-400 font-semibold mt-1">Atribuídos à campanha de origem</div>
-            </div>
-
-            <!-- Card 5: Taxa de Qualificação (Meta -> Dinx Qualif) -->
-            <div class="bg-white border border-slate-100 rounded-xl p-5 relative overflow-hidden shadow-sm">
-              <div class="absolute top-0 inset-x-0 h-1 bg-pink-500"></div>
-              <div class="flex items-center gap-2 mb-3 justify-between">
-                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wide">TAXA DE QUALIFICAÇÃO</span>
-                <div class="p-1 rounded-lg bg-pink-50 text-pink-600">
-                  <i data-lucide="percent" class="w-3.5 h-3.5"></i>
-                </div>
-              </div>
-              <div class="text-xl md:text-2xl font-extrabold text-slate-800 tracking-tight" id="meta-kpi-taxa-qualif">0,00%</div>
-              <div class="text-[10px] text-slate-400 font-semibold mt-1">Qualificados sobre cadastros</div>
-            </div>
-          </div>
-
-          <!-- HIGHLIGHTS SECTION (CAMPANHA & CREATIVO DESTAQUE) -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <!-- Campanha Destaque -->
-            <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors">
-              <div class="flex items-center gap-4">
-                <div class="p-3 rounded-xl bg-purple-50 text-purple-600">
-                  <i data-lucide="award" class="w-6 h-6"></i>
-                </div>
-                <div>
-                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5" id="label-campaign-status">Campanha Destaque</span>
-                  <span class="text-sm font-extrabold text-slate-800 line-clamp-1" id="highlight-campaign-name">Nenhuma atribuída</span>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="text-base font-extrabold text-purple-600 whitespace-nowrap" id="highlight-campaign-value">0 qualif.</span>
-                <span class="text-[10px] text-slate-400 font-bold block whitespace-nowrap" id="highlight-campaign-sub">R$ 0,00 investido</span>
-              </div>
-            </div>
-
-            <!-- Criativo Destaque -->
-            <div class="bg-white border border-slate-100 rounded-xl p-5 shadow-sm flex items-center justify-between hover:bg-slate-50 transition-colors">
-              <div class="flex items-center gap-4 w-[60%]">
-                <div class="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center flex-shrink-0 shadow-sm border border-slate-100" id="highlight-ad-image-container">
-                  <i data-lucide="image" class="w-5 h-5 text-slate-400"></i>
-                </div>
-                <div class="min-w-0">
-                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5" id="label-ad-status">Criativo Destaque</span>
-                  <span class="text-sm font-extrabold text-slate-800 line-clamp-1" id="highlight-ad-name">Nenhum atribuído</span>
-                </div>
-              </div>
-              <div class="text-right">
-                <span class="text-base font-extrabold text-emerald-600 whitespace-nowrap" id="highlight-ad-value">0 qualif.</span>
-                <span class="text-[10px] text-slate-400 font-bold block whitespace-nowrap" id="highlight-ad-sub">R$ 0,00 investido</span>
-              </div>
-            </div>
           </div>
 
           <!-- Table Controls Filter Card -->
@@ -698,6 +623,6 @@
   </div>
 
   <!-- Javascript Logic -->
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
