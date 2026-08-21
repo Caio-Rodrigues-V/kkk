@@ -687,20 +687,14 @@
           <div class="mt-8">
             <h3 class="text-lg font-extrabold text-slate-800 mb-6">Últimas Publicações</h3>
             <div class="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
-              <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-600 table-fixed">
-                  <thead class="bg-slate-50/50 text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100">
-                    <tr>
-                      <th class="w-[58%] px-6 py-4">Publicação</th>
-                      <th class="w-[14%] px-6 py-4 text-right text-blue-600">Interações &darr;</th>
-                      <th class="w-[14%] px-6 py-4 text-right">Curtidas</th>
-                      <th class="w-[14%] px-6 py-4 text-right">Comentários</th>
-                    </tr>
-                  </thead>
-                  <tbody id="ig-media-table-body">
-                    <!-- Table rows injected here -->
-                  </tbody>
-                </table>
+              <div class="grid grid-cols-[minmax(0,1fr)_repeat(3,minmax(88px,112px))] gap-3 bg-slate-50/50 px-5 py-3 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 max-md:hidden">
+                <span>Publicação</span>
+                <span class="text-right text-blue-600">Interações</span>
+                <span class="text-right">Curtidas</span>
+                <span class="text-right">Comentários</span>
+              </div>
+              <div id="ig-media-table-body" class="divide-y divide-slate-100">
+                <!-- Post rows injected here -->
               </div>
             </div>
           </div>
@@ -712,6 +706,6 @@
   </div>
 
   <!-- Javascript Logic -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

@@ -1088,7 +1088,7 @@ function renderInstagramTab() {
   tableBody.innerHTML = "";
 
   if (media.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="4" class="text-center py-10 text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</td></tr>`;
+    tableBody.innerHTML = `<div class="text-center py-10 text-slate-400 font-bold uppercase tracking-wide text-xs">Nenhuma publicação encontrada</div>`;
     const bestPostContainer = document.getElementById("ig-best-post-container");
     if(bestPostContainer) bestPostContainer.classList.add("hidden");
     return;
@@ -1143,26 +1143,35 @@ function renderInstagramTab() {
     
     const interactions = m.total_interactions || m.engagement || m.carousel_album_engagement || (likes + comments + (parseInt(saved) || 0) + (parseInt(shares) || 0));
     
-    const tr = document.createElement("tr");
-    tr.className = "hover:bg-slate-50/50 transition-colors border-b border-slate-100 last:border-b-0";
-    tr.innerHTML = `
-      <td class="px-6 py-4">
-        <a href="${m.permalink}" target="_blank" class="flex items-center gap-4 group">
-          <div class="w-12 h-12 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
-            <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
-            ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
-          </div>
-          <div class="min-w-0">
-            <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-2">${caption}</p>
-            <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
-          </div>
-        </a>
-      </td>
-      <td class="px-6 py-4 text-right font-semibold text-blue-600">${formatInteger(interactions)}</td>
-      <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(likes)}</td>
-      <td class="px-6 py-4 text-right font-semibold text-slate-700">${formatInteger(comments)}</td>
+    const row = document.createElement("div");
+    row.className = "grid grid-cols-[minmax(0,1fr)_repeat(3,minmax(88px,112px))] max-md:grid-cols-1 gap-3 px-5 py-4 hover:bg-slate-50/70 transition-colors";
+    row.innerHTML = `
+      <a href="${m.permalink}" target="_blank" class="flex min-w-0 items-center gap-4 group">
+        <div class="w-12 h-12 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 relative">
+          <img src="${mediaUrl}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+          ${m.media_type === 'VIDEO' ? `<div class="absolute inset-0 flex items-center justify-center bg-black/20"><i data-lucide="play" class="w-4 h-4 text-white fill-white"></i></div>` : ''}
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-semibold text-slate-700 whitespace-normal line-clamp-2">${caption}</p>
+          <span class="text-[10px] font-bold uppercase tracking-wide text-slate-400 mt-1 block">${typeLabel}</span>
+        </div>
+      </a>
+      <div class="grid grid-cols-3 gap-2 pl-16 md:contents md:gap-0 md:pl-0">
+        <div class="text-right max-md:text-left">
+          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Interações</span>
+          <span class="text-sm font-extrabold text-blue-600">${formatInteger(interactions)}</span>
+        </div>
+        <div class="text-right max-md:text-left">
+          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Curtidas</span>
+          <span class="text-sm font-bold text-slate-700">${formatInteger(likes)}</span>
+        </div>
+        <div class="text-right max-md:text-left">
+          <span class="hidden max-md:block text-[9px] font-extrabold uppercase tracking-wide text-slate-400">Comentários</span>
+          <span class="text-sm font-bold text-slate-700">${formatInteger(comments)}</span>
+        </div>
+      </div>
     `;
-    tableBody.appendChild(tr);
+    tableBody.appendChild(row);
   });
   
   if (window.lucide) lucide.createIcons();
@@ -1170,7 +1179,7 @@ function renderInstagramTab() {
     console.error("Error in renderInstagramTab:", error);
     const tableBody = document.getElementById("ig-media-table-body");
     if (tableBody) {
-      tableBody.innerHTML = `<tr><td colspan="5" class="p-8 text-red-500 font-mono text-xs whitespace-pre-wrap">${error.message}\n${error.stack}</td></tr>`;
+      tableBody.innerHTML = `<div class="p-8 text-red-500 font-mono text-xs whitespace-pre-wrap">${error.message}\n${error.stack}</div>`;
     } else {
       alert("Erro fatal: " + error.message);
     }
