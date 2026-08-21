@@ -1173,18 +1173,12 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     
     for c in meta_campaigns:
         obj = c.get("objective", "").upper()
+        c_name = c.get("name", "").lower()
+        is_branding = "alcance" in c_name or "reconhecimento" in c_name or "engajamento" in c_name
         
-        # Leads: Exclusivamente Conversão, Tráfego e Cadastros (Leads)
-        is_lead = obj in [
-            "OUTCOME_LEADS", "LEAD_GENERATION",   # Leads
-            "OUTCOME_TRAFFIC", "TRAFFIC", "LINK_CLICKS", # Tráfego
-            "OUTCOME_SALES", "CONVERSIONS"        # Conversão
-        ]
-        
-        if is_lead:
+        if not is_branding:
             lead_campaign_spend += c["spend"]
         else:
-            # Branding: Todo o resto (Alcance, Reconhecimento, Engajamento, Visualização de Vídeo)
             profile_visit_spend += c["spend"]
             
     aggregated_data = {
