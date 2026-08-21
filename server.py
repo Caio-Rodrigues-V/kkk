@@ -1065,6 +1065,36 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
     direct_campaigns = {}
     direct_adsets = {}
     direct_ads = {}
+
+    # Load Meta entities for the requested date range before attribution, so exact UTM IDs
+    # can be accepted only when they match entities returned by Meta.
+    meta_campaigns_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_campaigns_raw = get_custom_meta_campaigns(start_date, end_date)
+    elif isinstance(meta_campaigns_raw_all, dict):
+        meta_campaigns_raw = meta_campaigns_raw_all.get(date_range, [])
+    else:
+        meta_campaigns_raw = meta_campaigns_raw_all if date_range == "all" else []
+
+    meta_adsets_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_adsets_raw = get_custom_meta_adsets(start_date, end_date)
+    elif isinstance(meta_adsets_raw_all, dict):
+        meta_adsets_raw = meta_adsets_raw_all.get(date_range, [])
+    else:
+        meta_adsets_raw = []
+
+    meta_ads_raw = []
+    if date_range == "custom" and start_date and end_date:
+        meta_ads_raw = get_custom_meta_ads(start_date, end_date)
+    elif isinstance(meta_ads_raw_all, dict):
+        meta_ads_raw = meta_ads_raw_all.get(date_range, [])
+    else:
+        meta_ads_raw = []
+
+    valid_campaign_ids = {str(c.get("id")) for c in meta_campaigns_raw if c.get("id")}
+    valid_adset_ids = {str(a.get("id")) for a in meta_adsets_raw if a.get("id")}
+    valid_ad_ids = {str(ad.get("id")) for ad in meta_ads_raw if ad.get("id")}
     
     # For attribution, we filter leads by range to match campaign dates
     for r in dinx_requests:
@@ -1113,6 +1143,33 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
             c_id = lead_meta.get("campaign_id")
             a_id = lead_meta.get("adset_id")
             ad_id = lead_meta.get("ad_id")
+
+        # Safe fallback: accept URL attribution only when UTM values are exact Meta IDs.
+        if not c_id and not a_id and not ad_id:
+            landing_url = r.get("landingUrl") or ""
+            if landing_url:
+                try:
+                    qs = urllib.parse.parse_qs(urllib.parse.urlparse(landing_url).query)
+
+                    def first_query_value(*keys):
+                        for key in keys:
+                            vals = qs.get(key)
+                            if vals and vals[0]:
+                                return str(vals[0])
+                        return None
+
+                    maybe_campaign_id = first_query_value("utm_campaign", "campaign_id", "campaignid", "fb_campaign_id")
+                    maybe_adset_id = first_query_value("utm_adset", "adset_id", "adsetid", "fb_adset_id")
+                    maybe_ad_id = first_query_value("utm_ad", "utm_content", "ad_id", "adid", "fb_ad_id")
+
+                    if maybe_campaign_id in valid_campaign_ids:
+                        c_id = maybe_campaign_id
+                    if maybe_adset_id in valid_adset_ids:
+                        a_id = maybe_adset_id
+                    if maybe_ad_id in valid_ad_ids:
+                        ad_id = maybe_ad_id
+                except Exception:
+                    pass
                 
         if c_id:
             if c_id not in direct_campaigns:
@@ -1144,16 +1201,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
             if is_ativado and in_activation_range:
                 direct_ads[ad_id]["activated"] += 1
                 
-    # Load Meta Campaigns for the requested date_range
-    meta_campaigns_raw = []
-    if date_range == "custom" and start_date and end_date:
-        meta_campaigns_raw = get_custom_meta_campaigns(start_date, end_date)
-    elif isinstance(meta_campaigns_raw_all, dict):
-        meta_campaigns_raw = meta_campaigns_raw_all.get(date_range, [])
-    else:
-        # Fallback for old cache structure
-        meta_campaigns_raw = meta_campaigns_raw_all if date_range == "all" else []
-        
     meta_campaigns = []
     for c in meta_campaigns_raw:
         meta_campaigns.append(dict(c))
@@ -1166,15 +1213,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
         c["dinx_approved"] = direct["approved"]
         c["dinx_activated"] = direct["activated"]
 
-    # Load Meta Adsets for the requested date_range
-    meta_adsets_raw = []
-    if date_range == "custom" and start_date and end_date:
-        meta_adsets_raw = get_custom_meta_adsets(start_date, end_date)
-    elif isinstance(meta_adsets_raw_all, dict):
-        meta_adsets_raw = meta_adsets_raw_all.get(date_range, [])
-    else:
-        meta_adsets_raw = []
-        
     meta_adsets = []
     for a in meta_adsets_raw:
         meta_adsets.append(dict(a))
@@ -1185,15 +1223,6 @@ def get_processed_data(exclude_internal=False, date_range="all", start_date=None
         a["dinx_leads"] = direct["leads"]
         a["dinx_approved"] = direct["approved"]
         a["dinx_activated"] = direct["activated"]
-        
-    # Load Meta Ads for the requested date_range
-    meta_ads_raw = []
-    if date_range == "custom" and start_date and end_date:
-        meta_ads_raw = get_custom_meta_ads(start_date, end_date)
-    elif isinstance(meta_ads_raw_all, dict):
-        meta_ads_raw = meta_ads_raw_all.get(date_range, [])
-    else:
-        meta_ads_raw = []
         
     meta_ads = []
     for ad in meta_ads_raw:
@@ -1277,6 +1306,29 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
     leads_with_landing_url = 0
     leads_with_utm_campaign = 0
     active_private_leads = 0
+    leads_with_exact_meta_id_utm = 0
+
+    all_campaign_ids = {
+        str(item.get("id"))
+        for items in (raw_data.get("meta_campaigns", {}) or {}).values()
+        if isinstance(items, list)
+        for item in items
+        if item.get("id")
+    }
+    all_adset_ids = {
+        str(item.get("id"))
+        for items in (raw_data.get("meta_adsets", {}) or {}).values()
+        if isinstance(items, list)
+        for item in items
+        if item.get("id")
+    }
+    all_ad_ids = {
+        str(item.get("id"))
+        for items in (raw_data.get("meta_ads", {}) or {}).values()
+        if isinstance(items, list)
+        for item in items
+        if item.get("id")
+    }
 
     for lead in dinx_requests:
         origin = str(lead.get("origin"))
@@ -1300,6 +1352,13 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
             leads_with_landing_url += 1
             if "utm_campaign=" in landing_url:
                 leads_with_utm_campaign += 1
+            try:
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(landing_url).query)
+                values = {str(v) for vals in qs.values() for v in vals if v}
+                if values.intersection(all_campaign_ids) or values.intersection(all_adset_ids) or values.intersection(all_ad_ids):
+                    leads_with_exact_meta_id_utm += 1
+            except Exception:
+                pass
 
     return {
         "last_updated": raw_data.get("last_updated"),
@@ -1338,7 +1397,8 @@ def build_debug_data(exclude_internal=False, date_range="all", start_date=None, 
             "leads_with_phone": leads_with_phone,
             "active_private_leads": active_private_leads,
             "leads_with_landing_url": leads_with_landing_url,
-            "leads_with_utm_campaign": leads_with_utm_campaign
+            "leads_with_utm_campaign": leads_with_utm_campaign,
+            "leads_with_exact_meta_id_utm": leads_with_exact_meta_id_utm
         },
         "meta_form_ids": raw_data.get("meta_form_ids", []),
         "meta_discovered_form_ids": raw_data.get("meta_discovered_form_ids", []),
